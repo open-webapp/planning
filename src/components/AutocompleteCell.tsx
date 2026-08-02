@@ -10,6 +10,7 @@ export interface AutocompleteCellProps {
   inputHoverStyle?: React.CSSProperties;
   inputFocusStyle?: React.CSSProperties;
   onStopClick?: (e: React.MouseEvent) => void;
+  multiline?: boolean;
 }
 
 interface MenuPos {
@@ -28,8 +29,9 @@ const AutocompleteCell: React.FC<AutocompleteCellProps> = ({
   inputHoverStyle,
   inputFocusStyle,
   onStopClick,
+  multiline = false,
 }) => {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const [editing, setEditing] = useState(false);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -41,6 +43,15 @@ const AutocompleteCell: React.FC<AutocompleteCellProps> = ({
 
   // Compute display query
   const displayQuery = editing ? query : value;
+
+  // Auto-resize the multiline field so wrapped text is never clipped
+  useEffect(() => {
+    if (!multiline) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [displayQuery, multiline]);
 
   // Filtering logic
   const trimmedQuery = displayQuery.trim();
@@ -100,7 +111,7 @@ const AutocompleteCell: React.FC<AutocompleteCellProps> = ({
   }, [open]);
 
   // Event handlers
-  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     e.target.select();
     setEditing(true);
     setQuery(value);
@@ -117,7 +128,7 @@ const AutocompleteCell: React.FC<AutocompleteCellProps> = ({
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setQuery(e.target.value);
     setOpen(true);
     setHighlight(-1);
@@ -125,7 +136,7 @@ const AutocompleteCell: React.FC<AutocompleteCellProps> = ({
     openMenu();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       commit(query);
@@ -169,6 +180,17 @@ const AutocompleteCell: React.FC<AutocompleteCellProps> = ({
     width: '100%',
     fontSize: '0.8125rem',
     outline: 'none',
+    ...(multiline
+      ? {
+          display: 'block',
+          resize: 'none',
+          overflow: 'hidden',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          boxSizing: 'border-box',
+          fontFamily: 'inherit',
+        }
+      : {}),
     ...(inputStyle && typeof inputStyle === 'object' ? inputStyle : {}),
   } as React.CSSProperties;
 
@@ -207,19 +229,36 @@ const AutocompleteCell: React.FC<AutocompleteCellProps> = ({
       }}
       onClick={handleStopClick}
     >
-      <input
-        ref={inputRef}
-        value={displayQuery}
-        onChange={handleChange}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        placeholder={placeholder}
-        autoComplete="off"
-        style={mergedInputStyle}
-      />
+      {multiline ? (
+        <textarea
+          ref={inputRef}
+          value={displayQuery}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          placeholder={placeholder}
+          autoComplete="off"
+          rows={1}
+          style={mergedInputStyle}
+        />
+      ) : (
+        <input
+          ref={inputRef}
+          value={displayQuery}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          placeholder={placeholder}
+          autoComplete="off"
+          style={mergedInputStyle}
+        />
+      )}
       {menuVisible && (
         <div style={menuStyle}>
           {filtered.map((item, i) => (

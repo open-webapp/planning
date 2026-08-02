@@ -63,10 +63,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
   }
 
   // Build filter options with custom values
-  const statusOptions = [...state.customStatuses]
-  const assigneeOptions = [...state.customAssignees]
-  const categoryOptions = [...state.customCategories]
-  const milestoneOptions = state.milestones.map((m) => m.name)
+  const statusOptions = state.customStatuses.map((s) => ({ value: s, label: s }))
+  const assigneeOptions = state.customAssignees.map((a) => ({ value: a, label: a }))
+  const categoryOptions = state.customCategories.map((c) => ({ value: c, label: c }))
+  const milestoneOptions = state.milestones.map((m) => ({ value: m.id, label: m.name }))
 
   return (
     <div className="border-b border-divider bg-monoWhite px-s6 py-s3 flex items-center gap-s3">
@@ -140,10 +140,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
   )
 }
 
+interface FilterOption {
+  value: string
+  label: string
+}
+
 interface FilterSelectProps {
   label: string
   value: string
-  options: string[]
+  options: FilterOption[]
   onSelect: (value: string) => void
   onAddNew: () => void
 }
@@ -157,6 +162,7 @@ const FilterSelect: React.FC<FilterSelectProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const selectedLabel = options.find((o) => o.value === value)?.label
 
   // Click-outside handler
   useEffect(() => {
@@ -179,7 +185,7 @@ const FilterSelect: React.FC<FilterSelectProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-s1 px-s2 py-s2 border border-divider rounded-md bg-monoWhite hover:bg-bg-alt transition-colors text-body-sm text-fg-2"
       >
-        <span>{value || label}</span>
+        <span>{selectedLabel || label}</span>
         <ChevronDown size={14} className="text-fg-3" />
       </button>
 
@@ -205,16 +211,16 @@ const FilterSelect: React.FC<FilterSelectProps> = ({
             {/* Options */}
             {options.map((option) => (
               <button
-                key={option}
+                key={option.value}
                 onClick={() => {
-                  onSelect(option)
+                  onSelect(option.value)
                   setIsOpen(false)
                 }}
                 className={`w-full text-left px-s3 py-s1 hover:bg-bg-alt transition-colors text-body-sm ${
-                  value === option ? 'text-netskopeBlue font-medium' : 'text-fg-1'
+                  value === option.value ? 'text-netskopeBlue font-medium' : 'text-fg-1'
                 }`}
               >
-                {option}
+                {option.label}
               </button>
             ))}
 

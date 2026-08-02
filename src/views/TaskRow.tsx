@@ -176,6 +176,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
             value={task.category}
             options={state.customCategories}
             placeholder="Category"
+            multiline
             onCommit={(v) => {
               dispatch({ type: 'UPDATE_TASK', taskId: task.id, patch: { category: v } })
               dispatch({ type: 'ADD_CUSTOM_VALUE', fieldName: 'customCategories', value: v })
@@ -193,6 +194,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
               background: 'transparent',
               borderRadius: 'var(--ns-r-md)',
               fontFamily: 'sans-serif',
+              lineHeight: '1.4',
             }}
             inputHoverStyle={{
               backgroundColor: 'var(--ns-ink-50)',

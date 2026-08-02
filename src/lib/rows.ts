@@ -55,6 +55,28 @@ export function computeRowMap(
   const visibleRows: Array<{ id: string; type: 'milestone' | 'task'; level: number }> = []
   let rowCounter = 0
 
+  // Recursively walk a task and all of its descendants (arbitrary depth),
+  // pushing rows into `target`. Descendants are only walked while every
+  // ancestor along the way is expanded.
+  const walk = (
+    t: Task,
+    level: number,
+    target: Array<{ id: string; type: 'milestone' | 'task'; level: number }>
+  ) => {
+    if (matches(t)) {
+      rowCounter++
+      rowNumberMap[t.id] = rowCounter
+      target.push({ id: t.id, type: 'task', level })
+    }
+
+    const isExpanded = expanded[t.id] !== false
+    if (isExpanded) {
+      const childrenOfTask = tasks.filter((k) => k.parentId === t.id)
+      const kids = sortSiblings(childrenOfTask, t.id, sortKey, sortDir, displaySchedules)
+      kids.forEach((k) => walk(k, level + 1, target))
+    }
+  }
+
   milestones.forEach((m) => {
     // Get top-level tasks for this milestone
     const topLevelTasksInMilestone = tasks.filter((t) => t.milestoneId === m.id && !t.parentId)
@@ -62,30 +84,7 @@ export function computeRowMap(
 
     const localRows: Array<{ id: string; type: 'milestone' | 'task'; level: number }> = []
 
-    tops.forEach((t) => {
-      // Get children of this task
-      const childrenOfTask = tasks.filter((k) => k.parentId === t.id)
-      const kids = sortSiblings(childrenOfTask, t.id, sortKey, sortDir, displaySchedules)
-      const isExpanded = expanded[t.id] !== false
-
-      // Add task if it matches filters
-      if (matches(t)) {
-        rowCounter++
-        rowNumberMap[t.id] = rowCounter
-        localRows.push({ id: t.id, type: 'task', level: 0 })
-      }
-
-      // Add children if task is expanded
-      if (isExpanded) {
-        kids.forEach((k) => {
-          if (matches(k)) {
-            rowCounter++
-            rowNumberMap[k.id] = rowCounter
-            localRows.push({ id: k.id, type: 'task', level: 1 })
-          }
-        })
-      }
-    })
+    tops.forEach((t) => walk(t, 0, localRows))
 
     // Add milestone row if it has children rows or no filter is active
     if (localRows.length > 0 || !anyFilter) {
@@ -100,27 +99,7 @@ export function computeRowMap(
   const unassignedTopLevel = tasks.filter((t) => !t.parentId && !milestoneIds.has(t.milestoneId as string))
   const sortedUnassigned = sortSiblings(unassignedTopLevel, null, sortKey, sortDir, displaySchedules)
 
-  sortedUnassigned.forEach((t) => {
-    const childrenOfTask = tasks.filter((k) => k.parentId === t.id)
-    const kids = sortSiblings(childrenOfTask, t.id, sortKey, sortDir, displaySchedules)
-    const isExpanded = expanded[t.id] !== false
-
-    if (matches(t)) {
-      rowCounter++
-      rowNumberMap[t.id] = rowCounter
-      visibleRows.push({ id: t.id, type: 'task', level: 0 })
-    }
-
-    if (isExpanded) {
-      kids.forEach((k) => {
-        if (matches(k)) {
-          rowCounter++
-          rowNumberMap[k.id] = rowCounter
-          visibleRows.push({ id: k.id, type: 'task', level: 1 })
-        }
-      })
-    }
-  })
+  sortedUnassigned.forEach((t) => walk(t, 0, visibleRows))
 
   // Build reverse map (number -> id)
   const numberToId: { [number: number]: string } = {}
