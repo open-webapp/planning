@@ -1,7 +1,8 @@
 export const TODAY = '2026-07-31'; // matches prototype but will be overridable in production (use new Date().toISOString().slice(0,10) for real app — judgment call)
 
 export function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date((dateStr || TODAY) + 'T00:00:00');
+  if (isNaN(d.getTime())) return TODAY;
   d.setDate(d.getDate() + Number(days || 0));
   return d.toISOString().slice(0, 10);
 }
@@ -16,13 +17,15 @@ export function isWeekend(dateStr: string): boolean {
 }
 
 export function nextWorkingDay(dateStr: string): string {
-  let d = new Date(dateStr + 'T00:00:00');
+  let d = new Date((dateStr || TODAY) + 'T00:00:00');
+  if (isNaN(d.getTime())) d = new Date(TODAY + 'T00:00:00');
   while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
   return d.toISOString().slice(0, 10);
 }
 
 export function addWorkingDays(dateStr: string, days: number): string {
-  let d = new Date(dateStr + 'T00:00:00');
+  let d = new Date((dateStr || TODAY) + 'T00:00:00');
+  if (isNaN(d.getTime())) d = new Date(TODAY + 'T00:00:00');
   const daysCount = Number(days || 0);
   let count = 0;
   while (count < daysCount) {

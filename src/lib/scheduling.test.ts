@@ -540,4 +540,35 @@ describe('scheduling', () => {
     expect(result.start).toBe('2026-08-03')
     expect(result.end).toBe('2026-08-05') // 2 working days from Mon 2026-08-03
   })
+
+  /**
+   * Test 11: Invalid/missing startDate
+   * Task with an empty or malformed startDate must not throw RangeError from Date.toISOString()
+   */
+  it('invalid startDate does not throw', () => {
+    const tasks: Task[] = [
+      {
+        id: 'task-bad-date',
+        name: 'Task with Bad Start Date',
+        milestoneId: null,
+        parentId: null,
+        category: 'Test',
+        assignee: 'Test',
+        status: 'Not Started',
+        estimate: 2,
+        startDate: '',
+        progress: 0,
+        dependencies: [],
+        comments: [],
+      },
+    ]
+    expect(() => {
+      computeBaseSchedules(tasks)
+    }).not.toThrow()
+    const base = computeBaseSchedules(tasks)
+    const result = base['task-bad-date']
+    expect(result).toBeDefined()
+    // Falls back to TODAY ('2026-07-31', a Friday, already a working day)
+    expect(result.start).toBe('2026-07-31')
+  })
 })

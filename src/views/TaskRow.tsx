@@ -41,11 +41,18 @@ const TaskRow: React.FC<TaskRowProps> = ({
   dispatch,
 }) => {
   const [newName, setNewName] = useState(task.name)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     setNewName(task.name)
   }, [task.name])
+
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [newName])
 
   const scheduleInfo = displaySchedules[task.id]
   const isParent = state.tasks.some((t) => t.parentId === task.id)
@@ -62,7 +69,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
     ? 'color-mix(in srgb, var(--ns-netskope-blue) 30%, white)'
     : 'var(--ns-border)'
 
-  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Tab') {
       e.preventDefault()
       if (e.shiftKey) {
@@ -71,7 +78,8 @@ const TaskRow: React.FC<TaskRowProps> = ({
         dispatch({ type: 'INDENT_TASK', taskId: task.id })
       }
     } else if (e.key === 'Enter') {
-      ;(e.target as HTMLInputElement).blur()
+      e.preventDefault()
+      ;(e.target as HTMLTextAreaElement).blur()
     }
   }
 
@@ -94,11 +102,12 @@ const TaskRow: React.FC<TaskRowProps> = ({
 
       case 'name':
         return (
-          <div className="flex min-w-0 items-center gap-s2">
+          <div className="flex min-w-0 w-full items-start gap-s2">
             {hasChildren ? (
               <button
                 onClick={() => dispatch({ type: 'TOGGLE_EXPAND', taskId: task.id })}
                 className="flex flex-shrink-0 items-center p-0 text-fg-3 hover:text-fg-1"
+                style={{ marginTop: '6px' }}
               >
                 {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </button>
@@ -109,26 +118,31 @@ const TaskRow: React.FC<TaskRowProps> = ({
               <span
                 title="On critical path"
                 className="flex-shrink-0 rounded-full"
-                style={{ width: '7px', height: '7px', background: 'var(--ns-orange)' }}
+                style={{ width: '7px', height: '7px', background: 'var(--ns-orange)', marginTop: '9px' }}
               />
             )}
-            <input
+            <textarea
               ref={inputRef}
               autoFocus={task.name === 'Unnamed'}
               data-task-id={task.id}
-              type="text"
               value={newName}
+              rows={1}
               onChange={(e) => setNewName(e.target.value)}
               onBlur={handleNameBlur}
               onKeyDown={handleNameKeyDown}
               onClick={(e) => e.stopPropagation()}
-              className={`min-w-0 flex-1 rounded font-sans ${inlineFieldClass}`}
+              title={task.name}
+              className={`min-w-0 flex-1 resize-none rounded font-sans ${inlineFieldClass}`}
               style={{
                 fontSize: '0.95rem',
                 color: 'var(--ns-fg-1)',
                 padding: '6px 8px',
                 margin: '-6px 0 -6px -8px',
                 paddingLeft: `${8 + visualLevel * 16}px`,
+                lineHeight: '1.4',
+                overflow: 'hidden',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
               }}
             />
           </div>
