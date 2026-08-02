@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { Search, ChevronDown, Plus } from 'lucide-react'
 import type { AppState } from '../lib/state'
-import { STATUS_OPTIONS } from '../lib/statusColors'
 
 export interface ToolbarProps {
   state: AppState
@@ -64,7 +63,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   }
 
   // Build filter options with custom values
-  const statusOptions = [...STATUS_OPTIONS, ...state.customStatuses.filter(s => !STATUS_OPTIONS.includes(s))]
+  const statusOptions = [...state.customStatuses]
   const assigneeOptions = [...state.customAssignees]
   const categoryOptions = [...state.customCategories]
   const milestoneOptions = state.milestones.map((m) => m.name)

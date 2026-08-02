@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight, Trash2, MessageSquare } from 'lucide-react'
 import type { Task } from '../lib/types'
 import type { AppState } from '../lib/state'
 import { formatDate } from '../lib/dates'
-import { statusColor as sharedStatusColor, STATUS_OPTIONS } from '../lib/statusColors'
+import { statusColor as sharedStatusColor } from '../lib/statusColors'
 import AutocompleteCell from '../components/AutocompleteCell'
 
 interface TaskRowProps {
@@ -206,11 +206,6 @@ const TaskRow: React.FC<TaskRowProps> = ({
         )
 
       case 'status': {
-        const dedupedStatusOptions = [
-          ...STATUS_OPTIONS,
-          ...state.customStatuses.filter(s => !STATUS_OPTIONS.includes(s))
-        ];
-
         const statusPillStyle: React.CSSProperties = {
           fontSize: '0.75rem',
           color: statusColor,
@@ -226,7 +221,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
         return (
           <AutocompleteCell
             value={task.status}
-            options={dedupedStatusOptions}
+            options={state.customStatuses}
             placeholder="Status"
             onCommit={(v) => {
               dispatch({ type: 'UPDATE_TASK', taskId: task.id, patch: { status: v } });

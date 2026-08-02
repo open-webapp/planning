@@ -1,5 +1,3 @@
-export const STATUS_OPTIONS = ['Not Started', 'In Progress', 'Blocked', 'Done']
-
 export const STATUS_COLORS: Record<string, string> = {
   'Not Started': 'var(--ns-ink-400)',
   'In Progress': 'var(--ns-netskope-blue)',
