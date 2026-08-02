@@ -82,9 +82,11 @@ const TaskDetailsOverlay: React.FC<TaskDetailsOverlayProps> = ({ state, dispatch
     }
   }, [dispatch, task.id, state.newCommentText])
 
-  const sortedComments = [...(task.comments || [])].sort(
-    (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()
-  )
+  const sortedComments = [...(task.comments || [])]
+    .filter((c) => c.ts && !isNaN(new Date(c.ts).getTime()))
+    .sort(
+      (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()
+    )
 
   return (
     <>

@@ -328,11 +328,11 @@ function computeRecentActivity(tasks: Task[]): ActivityFeedItem[] {
 
   // Sort by timestamp descending (newest first)
   allComments.sort((a, b) => {
-    const aTime = new Date(a.ts).getTime()
-    const bTime = new Date(b.ts).getTime()
+    const aTime = a.ts && !isNaN(new Date(a.ts).getTime()) ? new Date(a.ts).getTime() : 0
+    const bTime = b.ts && !isNaN(new Date(b.ts).getTime()) ? new Date(b.ts).getTime() : 0
     return bTime - aTime
   })
 
-  // Return top 8
-  return allComments.slice(0, 8)
+  // Return top 8, filtering out entries with invalid timestamps
+  return allComments.filter((c) => c.ts && !isNaN(new Date(c.ts).getTime())).slice(0, 8)
 }
