@@ -76,6 +76,17 @@ function clearToken(): void {
 }
 
 /**
+ * True if a Sheets API error body indicates the cached token was granted
+ * without the scopes we need (e.g. a token cached before 'spreadsheets' was
+ * added to the requested scope, or one granted via a narrower consent).
+ * Cached tokens don't record their granted scope, so this is how we detect
+ * a stale token instead of reusing it for the remainder of its 1hr lifetime.
+ */
+function isScopeInsufficientError(errorText: string): boolean {
+  return /ACCESS_TOKEN_SCOPE_INSUFFICIENT/.test(errorText);
+}
+
+/**
  * Get or request a valid access token.
  * Attempts to use cached token if valid; requests new token if expired or missing.
  */
@@ -253,6 +264,9 @@ async function ensureSheetTabs(spreadsheetId: string, token: string): Promise<vo
 
     if (!metadataResponse.ok) {
       const errorText = await metadataResponse.text();
+      if (metadataResponse.status === 403 && isScopeInsufficientError(errorText)) {
+        clearToken();
+      }
       if (metadataResponse.status === 404 || metadataResponse.status === 403) {
         const accountEmail = await getTokenAccountEmail(token);
         throw new Error(
@@ -333,8 +347,16 @@ export async function pullFromSheet(
       },
     });
 
-    // If not found or forbidden, return null (sheet doesn't exist or tab doesn't exist)
+    // If not found or forbidden, return null (sheet doesn't exist or tab doesn't exist).
+    // Exception: a 403 caused by insufficient token scope is an auth problem, not a
+    // missing sheet — swallowing it here would make sync silently treat a real
+    // permissions failure as "first sync" and try to overwrite the sheet.
     if (response.status === 404 || response.status === 403) {
+      const errorText = await response.text();
+      if (response.status === 403 && isScopeInsufficientError(errorText)) {
+        clearToken();
+        throw new Error(`Insufficient token scope: ${errorText}`);
+      }
       logger.info('Sheet or Tasks tab not found, returning null for first-ever sync');
       return null;
     }
@@ -533,6 +555,9 @@ export async function pushToSheet(
 
     if (!batchUpdateResponse.ok) {
       const errorText = await batchUpdateResponse.text();
+      if (batchUpdateResponse.status === 403 && isScopeInsufficientError(errorText)) {
+        clearToken();
+      }
       throw new Error(`Failed to push to sheet: ${batchUpdateResponse.status} - ${errorText}`);
     }
 

@@ -599,6 +599,32 @@ export function setColumnWidth(state: AppState, columnName: string, width: numbe
 
 
 /**
+ * Merge any status/assignee/category values found on the given tasks into the
+ * corresponding custom dropdown lists, so values introduced by an external
+ * source (e.g. a spreadsheet sync) show up as filter/autocomplete options.
+ */
+export function mergeCustomValuesFromTasks(
+  state: AppState,
+  tasks: Task[]
+): Pick<AppState, 'customStatuses' | 'customAssignees' | 'customCategories'> {
+  const mergeField = (existing: string[], values: (string | undefined)[]) => {
+    const merged = [...existing]
+    for (const value of values) {
+      if (value && !merged.includes(value)) {
+        merged.push(value)
+      }
+    }
+    return merged
+  }
+
+  return {
+    customStatuses: mergeField(state.customStatuses, tasks.map((t) => t.status)),
+    customAssignees: mergeField(state.customAssignees, tasks.map((t) => t.assignee)),
+    customCategories: mergeField(state.customCategories, tasks.map((t) => t.category)),
+  }
+}
+
+/**
  * Handle value select from dropdown: either take the value directly or prompt if it's a special "add new" marker.
  */
 export function handleValueSelect(

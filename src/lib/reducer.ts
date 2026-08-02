@@ -167,6 +167,7 @@ export function appReducer(state: AppState, action: Action): AppState {
       })
       return {
         ...state,
+        ...StateActions.mergeCustomValuesFromTasks(state, action.tasks),
         syncBusy: false,
         syncStatus: `Synced at ${syncTime}`,
         tasks: action.tasks,
