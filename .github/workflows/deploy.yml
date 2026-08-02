@@ -1,0 +1,39 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.VITE_GOOGLE_CLIENT_ID }}" ]; then
+            echo "ERROR: VITE_GOOGLE_CLIENT_ID secret is not set or empty"
+            exit 1
+          fi
+          echo "✓ VITE_GOOGLE_CLIENT_ID is set"
+
+      - run: npm ci
+      - run: rm -rf dist/
+      - run: npm run build
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
