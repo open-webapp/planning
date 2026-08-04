@@ -3,6 +3,17 @@ import { Check, Plus } from 'lucide-react'
 import type { AppState } from '../lib/state'
 import { switchProject, promptNewProject } from '../lib/state'
 
+function getProjectTaskCount(state: AppState, projectId: string): number {
+  if (projectId === state.activeProjectId) {
+    return state.tasks.length
+  }
+  return state.savedProjects[projectId]?.tasks.length ?? 0
+}
+
+function formatTaskCount(count: number): string {
+  return count === 1 ? '1 task' : `${count} tasks`
+}
+
 export interface ProjectSwitcherProps {
   state: AppState
   dispatch: (state: AppState) => void
@@ -65,6 +76,7 @@ const ProjectSwitcher: React.FC<ProjectSwitcherProps> = ({
       <div className="max-h-64 overflow-y-auto">
         {state.projects.map((project) => {
           const isActive = state.activeProjectId === project.id
+          const count = getProjectTaskCount(state, project.id)
           return (
             <button
               key={project.id}
@@ -76,7 +88,7 @@ const ProjectSwitcher: React.FC<ProjectSwitcherProps> = ({
                   isActive ? 'text-fg-1 font-medium' : 'text-fg-1 font-regular'
                 }`}
               >
-                {project.name}
+                {project.name} ({formatTaskCount(count)})
               </span>
               {isActive && <Check size={14} className="text-netskopeBlue flex-shrink-0" strokeWidth={2.2} />}
             </button>

@@ -69,25 +69,25 @@ export function parseSyncError(rawError: string): FriendlySyncError {
 
       if (reason === 'SERVICE_DISABLED') {
         return {
-          message: `${serviceTitle || 'Google Sheets API'} isn't enabled for this app's Google Cloud project yet.`,
+          message: `${serviceTitle || 'Google Drive API'} isn't enabled for this app's Google Cloud project yet.`,
           actionUrl: activationUrl,
           actionLabel: 'Enable the API',
         }
       }
 
       if (apiError?.status === 'PERMISSION_DENIED') {
-        const base = apiError.message || 'Google denied access to this spreadsheet. Make sure it is shared with your account.'
+        const base = apiError.message || 'Google denied access to this Drive file. Make sure it is still owned by the connected account.'
         return {
-          message: accountEmail ? `${base} (request used ${accountEmail} — check this matches the account the sheet is shared with)` : base,
+          message: accountEmail ? `${base} (request used ${accountEmail} — check this matches the account the file was created with)` : base,
         }
       }
 
       if (apiError?.status === 'NOT_FOUND') {
         // Google returns 404 (not 403) both when the ID is wrong AND when the file
-        // exists but isn't shared with the authenticated account — it hides which.
-        const base = "Spreadsheet not found. Either the ID is wrong, or the sheet isn't shared with the connected Google account."
+        // exists but isn't accessible to the authenticated account — it hides which.
+        const base = "Drive file not found. Either it was deleted/moved outside the app, or it isn't accessible to the connected Google account."
         return {
-          message: accountEmail ? `${base} The request used ${accountEmail} — check this matches the account the sheet is shared with (it may differ from what's shown in Settings if the token silently refreshed).` : base,
+          message: accountEmail ? `${base} The request used ${accountEmail} — check this matches the account the file was created with (it may differ from what's shown in Settings if the token silently refreshed).` : base,
         }
       }
     } catch {

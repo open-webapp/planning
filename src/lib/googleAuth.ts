@@ -1,5 +1,5 @@
 import type { Task, Milestone } from './types'
-import { uid } from './seed'
+import { buildTasksCsvString, getCSVFilename } from './csv'
 
 declare global {
   interface Window {
@@ -17,8 +17,12 @@ let tokenClient: any;
 let tokenResolve: ((token: string) => void) | null = null;
 let tokenReject: ((error: Error) => void) | null = null;
 let inFlightTokenPromise: Promise<string> | null = null;
-const TOKEN_STORAGE_KEY = 'projects_app_oauth_token';
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;  // Refresh 5 min before expiry
+
+// Get per-project storage key
+function getTokenStorageKey(projectId: string): string {
+  return `projects_app_oauth_token_${projectId}`;
+}
 
 const logger = {
   info: (msg: string, ...args: any[]) => console.log(`[Google Auth] ${msg}`, ...args),
@@ -30,9 +34,10 @@ const logger = {
  * Load cached token from localStorage if valid.
  * Returns null if token is missing, expired, or invalid.
  */
-function getCachedToken(): TokenData | null {
+function getCachedToken(projectId: string): TokenData | null {
   try {
-    const stored = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const storageKey = getTokenStorageKey(projectId);
+    const stored = localStorage.getItem(storageKey);
     if (!stored) return null;
 
     const data: TokenData = JSON.parse(stored);
@@ -41,7 +46,7 @@ function getCachedToken(): TokenData | null {
     // Check expiry with buffer (refresh 5 min before actual expiry)
     if (data.expires_at && now >= data.expires_at - TOKEN_EXPIRY_BUFFER_MS) {
       logger.debug('Cached token expired (or expiring soon), will refresh');
-      clearToken();
+      clearToken(projectId);
       return null;
     }
 
@@ -57,22 +62,24 @@ function getCachedToken(): TokenData | null {
  * Save token to localStorage with expiry tracking.
  * GIS client doesn't provide explicit expiry, assume standard 1 hour.
  */
-function saveToken(accessToken: string): void {
+function saveToken(projectId: string, accessToken: string): void {
   const data: TokenData = {
     access_token: accessToken,
     expires_at: Date.now() + 3600 * 1000,  // 1 hour (standard Google access token TTL)
     requested_at: Date.now(),
   };
-  localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(data));
-  logger.info('Token saved to storage');
+  const storageKey = getTokenStorageKey(projectId);
+  localStorage.setItem(storageKey, JSON.stringify(data));
+  logger.info(`Token saved to storage for project ${projectId}`);
 }
 
 /**
  * Clear cached token (on logout/revocation).
  */
-function clearToken(): void {
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
-  logger.info('Token cleared from storage');
+function clearToken(projectId: string): void {
+  const storageKey = getTokenStorageKey(projectId);
+  localStorage.removeItem(storageKey);
+  logger.info(`Token cleared from storage for project ${projectId}`);
 }
 
 /**
@@ -87,12 +94,12 @@ function isScopeInsufficientError(errorText: string): boolean {
 }
 
 /**
- * Get or request a valid access token.
+ * Get or request a valid access token for a specific project.
  * Attempts to use cached token if valid; requests new token if expired or missing.
  */
-export async function getAccessToken(): Promise<string> {
+export async function getAccessToken(projectId: string): Promise<string> {
   // Try cached token first
-  const cached = getCachedToken();
+  const cached = getCachedToken(projectId);
   if (cached) {
     return cached.access_token;
   }
@@ -104,7 +111,7 @@ export async function getAccessToken(): Promise<string> {
     return inFlightTokenPromise;
   }
 
-  inFlightTokenPromise = requestAccessToken().finally(() => {
+  inFlightTokenPromise = requestAccessToken(projectId).finally(() => {
     inFlightTokenPromise = null;
   });
   return inFlightTokenPromise;
@@ -139,9 +146,12 @@ function waitForGoogleIdentityServices(timeoutMs = 10000): Promise<void> {
 /**
  * Request a new access token from Google.
  * User may be prompted for consent if scope not previously granted.
- * Scopes: spreadsheets and userinfo.email
+ * Scopes: drive.file and userinfo.email
+ * @param projectId Project to save the token for
+ * @param scopes Optional OAuth scopes
+ * @param callback Optional callback when token is obtained
  */
-export async function requestAccessToken(scopes?: string[], callback?: (token: string) => void): Promise<string> {
+export async function requestAccessToken(projectId: string, scopes?: string[], callback?: (token: string) => void): Promise<string> {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   if (!clientId) {
@@ -153,7 +163,7 @@ export async function requestAccessToken(scopes?: string[], callback?: (token: s
   await waitForGoogleIdentityServices();
 
   return new Promise((resolve, reject) => {
-    const scope = scopes ? scopes.join(' ') : 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email';
+    const scope = scopes ? scopes.join(' ') : 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
 
     if (!tokenClient) {
       tokenClient = window.google.accounts.oauth2.initTokenClient({
@@ -164,8 +174,8 @@ export async function requestAccessToken(scopes?: string[], callback?: (token: s
             logger.error('Token request failed:', response.error);
             tokenReject?.(new Error(`OAuth error: ${response.error}`));
           } else {
-            logger.info('Token obtained successfully');
-            saveToken(response.access_token);
+            logger.info('Token obtained successfully for project', projectId);
+            saveToken(projectId, response.access_token);
             if (callback) callback(response.access_token);
             tokenResolve?.(response.access_token);
           }
@@ -183,19 +193,19 @@ export async function requestAccessToken(scopes?: string[], callback?: (token: s
 }
 
 /**
- * Revoke the current token (logout).
+ * Revoke the token for a specific project.
  * Clears cached token and attempts to revoke with Google's revocation endpoint.
  */
-export async function revokeToken(): Promise<void> {
+export async function revokeToken(projectId: string): Promise<void> {
   try {
-    const cached = getCachedToken();
+    const cached = getCachedToken(projectId);
     if (!cached) {
-      logger.info('No token to revoke');
-      clearToken();
+      logger.info('No token to revoke for project', projectId);
+      clearToken(projectId);
       return;
     }
 
-    logger.info('Revoking token...');
+    logger.info('Revoking token for project', projectId);
     const response = await fetch('https://oauth2.googleapis.com/revoke', {
       method: 'POST',
       headers: {
@@ -208,369 +218,314 @@ export async function revokeToken(): Promise<void> {
       logger.error('Token revocation returned status', response.status);
     }
 
-    clearToken();
-    logger.info('Token revoked successfully');
+    clearToken(projectId);
+    logger.info('Token revoked successfully for project', projectId);
   } catch (error) {
     logger.error('Failed to revoke token:', error);
     // Still clear cached token even if revocation failed (best-effort)
-    clearToken();
+    clearToken(projectId);
     throw error;
   }
 }
 
 /**
- * Get authentication status: whether a valid token exists.
+ * Get authentication status for a specific project: whether a valid token exists.
  */
-export function getAuthStatus(): { authenticated: boolean; cachedToken: boolean } {
-  const cached = getCachedToken();
+export function getAuthStatus(projectId: string): { authenticated: boolean; cachedToken: boolean } {
+  const cached = getCachedToken(projectId);
   return {
     authenticated: cached !== null,
     cachedToken: cached !== null,
   };
 }
 
-/**
- * Look up which Google account a token actually belongs to.
- * Used to surface account-mismatch diagnostics when a sheet request
- * unexpectedly 404s/403s despite the user believing they're on the right account.
- */
-async function getTokenAccountEmail(token: string): Promise<string | null> {
-  try {
-    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) return null;
-    const info = await response.json();
-    return info.email || null;
-  } catch {
-    return null;
-  }
-}
 
 /**
- * Ensure that the spreadsheet has a 'Tasks' tab (the single tab that holds all synced data).
- * Creates it if missing.
+ * Find or create a folder in Google Drive.
+ * Queries for a folder with the given name under the specified parent.
+ * If not found, creates a new folder and returns its ID.
+ * When parentId is undefined, searches under 'root'.
+ *
+ * @param name Folder name to find or create
+ * @param parentId Parent folder ID, or undefined for root
+ * @param token OAuth access token
+ * @param projectId Project ID (for clearing token on auth failures)
+ * @returns The folder ID
  */
-async function ensureSheetTabs(spreadsheetId: string, token: string): Promise<void> {
-  spreadsheetId = spreadsheetId.trim();
+export async function findOrCreateFolder(
+  name: string,
+  parentId: string | undefined,
+  token: string,
+  projectId: string
+): Promise<string> {
   try {
-    // Fetch spreadsheet metadata to check existing tabs
-    const metadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`;
-    const metadataResponse = await fetch(metadataUrl, {
+    const parentQuery = parentId ? `'${parentId}' in parents` : `'root' in parents`;
+    const query = `${parentQuery} and name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const encodedQuery = encodeURIComponent(query);
+
+    const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodedQuery}&fields=files(id,name)`;
+    const searchResponse = await fetch(searchUrl, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
 
-    if (!metadataResponse.ok) {
-      const errorText = await metadataResponse.text();
-      if (metadataResponse.status === 403 && isScopeInsufficientError(errorText)) {
-        clearToken();
+    if (!searchResponse.ok) {
+      const errorText = await searchResponse.text();
+      if (searchResponse.status === 403 && isScopeInsufficientError(errorText)) {
+        clearToken(projectId);
       }
-      if (metadataResponse.status === 404 || metadataResponse.status === 403) {
-        const accountEmail = await getTokenAccountEmail(token);
-        throw new Error(
-          `Failed to fetch spreadsheet metadata: ${metadataResponse.status} - ${errorText} (request was made as ${accountEmail || 'an unknown account'})`
-        );
-      }
-      throw new Error(`Failed to fetch spreadsheet metadata: ${metadataResponse.status} - ${errorText}`);
+      throw new Error(`Failed to search for folder: ${searchResponse.status} - ${errorText}`);
     }
 
-    const metadata = await metadataResponse.json();
-    const existingTabs = new Set((metadata.sheets || []).map((s: any) => s.properties.title));
+    const searchData = await searchResponse.json();
+    const files = searchData.files || [];
 
-    const requiredTabs = ['Tasks'];
-    const missingTabs = requiredTabs.filter((tab) => !existingTabs.has(tab));
-
-    if (missingTabs.length === 0) {
-      logger.debug('All required tabs already exist');
-      return;
+    if (files.length > 0) {
+      logger.info(`Found existing folder "${name}": ${files[0].id}`);
+      return files[0].id;
     }
 
-    // Create missing tabs via batchUpdate
-    const requests = missingTabs.map((title) => ({
-      addSheet: {
-        properties: {
-          title,
-        },
-      },
-    }));
+    // Folder not found, create it
+    const createUrl = 'https://www.googleapis.com/drive/v3/files';
+    const createBody = {
+      name,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [parentId || 'root'],
+    };
 
-    const batchUpdateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
-    const batchUpdateResponse = await fetch(batchUpdateUrl, {
+    const createResponse = await fetch(createUrl, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ requests }),
+      body: JSON.stringify(createBody),
     });
 
-    if (!batchUpdateResponse.ok) {
-      const errorText = await batchUpdateResponse.text();
-      throw new Error(`Failed to create sheets: ${batchUpdateResponse.status} - ${errorText}`);
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text();
+      if (createResponse.status === 403 && isScopeInsufficientError(errorText)) {
+        clearToken(projectId);
+      }
+      throw new Error(`Failed to create folder: ${createResponse.status} - ${errorText}`);
     }
 
-    logger.info(`Created missing tabs: ${missingTabs.join(', ')}`);
+    const createData = await createResponse.json();
+    logger.info(`Created new folder "${name}": ${createData.id}`);
+    return createData.id;
   } catch (error) {
-    logger.error('Error ensuring sheet tabs:', error);
+    logger.error('Error in findOrCreateFolder:', error);
     throw error;
   }
 }
 
 /**
- * Pull (read) tasks and milestones from a Google Sheet using values:batchGet.
- * All data lives in a single 'Tasks' tab; milestones are synced as a plain
- * text 'milestone' column on each task row (same as 'assignee' or 'category'),
- * not as a separate tab keyed by id. Milestone entities are reconstructed from
- * the distinct milestone names seen, reusing ids from existingMilestones where
- * the name matches so stable identity survives round-trips, and minting new
- * ids (via uid) for names that aren't already known.
- * Returns null if the sheet or the 'Tasks' tab doesn't exist (first-ever sync from empty sheet).
+ * Ensure the app's folder structure exists in Google Drive.
+ * Creates or finds the 'OpenWebApp' folder at root, then creates or finds
+ * the 'Planning' subfolder within it.
+ * Returns the ID of the innermost ('Planning') folder.
  *
- * @param spreadsheetId Google Sheets spreadsheet ID
  * @param token OAuth access token
- * @param existingMilestones Milestones already known in the browser, used to resolve milestone names back to stable ids
- * @returns {tasks: Task[], milestones: Milestone[]} or null if sheet/tab doesn't exist
+ * @param projectId Project ID (for clearing token on auth failures)
+ * @returns The Planning folder ID
  */
-export async function pullFromSheet(
-  spreadsheetId: string,
-  token: string,
-  existingMilestones: Milestone[] = []
-): Promise<{ tasks: Task[]; milestones: Milestone[] } | null> {
-  spreadsheetId = spreadsheetId.trim();
+export async function ensureAppFolder(token: string, projectId: string): Promise<string> {
   try {
-    const batchGetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?ranges=Tasks!A:Z`;
-    const response = await fetch(batchGetUrl, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const openWebAppId = await findOrCreateFolder('OpenWebApp', undefined, token, projectId);
+    const planningId = await findOrCreateFolder('Planning', openWebAppId, token, projectId);
+    logger.info('App folder structure ensured');
+    return planningId;
+  } catch (error) {
+    logger.error('Error in ensureAppFolder:', error);
+    throw error;
+  }
+}
 
-    // If not found or forbidden, return null (sheet doesn't exist or tab doesn't exist).
-    // Exception: a 403 caused by insufficient token scope is an auth problem, not a
-    // missing sheet — swallowing it here would make sync silently treat a real
-    // permissions failure as "first sync" and try to overwrite the sheet.
-    if (response.status === 404 || response.status === 403) {
-      const errorText = await response.text();
-      if (response.status === 403 && isScopeInsufficientError(errorText)) {
-        clearToken();
-        throw new Error(`Insufficient token scope: ${errorText}`);
-      }
-      logger.info('Sheet or Tasks tab not found, returning null for first-ever sync');
-      return null;
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-
-      // A spreadsheet that exists but doesn't yet have a 'Tasks' tab
-      // (e.g. a brand-new sheet with only the default 'Sheet1') fails range parsing
-      // with 400 INVALID_ARGUMENT rather than 404 — treat it the same as "no data yet".
-      if (response.status === 400 && /Unable to parse range/i.test(errorText)) {
-        logger.info('Tab not found (range parse error), returning null for first-ever sync');
-        return null;
-      }
-
-      throw new Error(`Failed to fetch sheet data: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    const valueRanges = data.valueRanges || [];
-
-    if (!valueRanges || valueRanges.length < 1) {
-      logger.info('Sheet tab not found, returning null for first-ever sync');
-      return null;
-    }
-
-    const tasksData = valueRanges[0];
-
-    const tasks: any[] = [];
-    const nameToId = new Map<string, string>();
-    existingMilestones.forEach((m) => {
-      if (m.name && !nameToId.has(m.name)) nameToId.set(m.name, m.id);
-    });
-    const milestoneOrder: string[] = [];
-
-    const resolveMilestoneId = (milestoneName: string): string | null => {
-      const name = milestoneName.trim();
-      if (!name) return null;
-      if (!nameToId.has(name)) {
-        nameToId.set(name, uid('m'));
-      }
-      if (!milestoneOrder.includes(name)) milestoneOrder.push(name);
-      return nameToId.get(name)!;
+/**
+ * Create a CSV file in Google Drive.
+ * Uses multipart/related upload with metadata and content.
+ *
+ * @param filename Name for the CSV file
+ * @param csvContent CSV content as string
+ * @param folderId Parent folder ID where the file will be created
+ * @param token OAuth access token
+ * @param projectId Project ID (for clearing token on auth failures)
+ * @returns The new file's ID
+ */
+export async function createDriveCsvFile(
+  filename: string,
+  csvContent: string,
+  folderId: string,
+  token: string,
+  projectId: string
+): Promise<string> {
+  try {
+    const metadata = {
+      name: filename,
+      parents: [folderId],
+      mimeType: 'text/csv',
     };
 
-    // Parse Tasks (single sheet holds all data)
-    if (tasksData.values && tasksData.values.length > 1) {
-      const headerRow = tasksData.values[0];
-      const idIdx = headerRow.indexOf('id');
-      const nameIdx = headerRow.indexOf('name');
-      const milestoneIdx = headerRow.indexOf('milestone');
-      const parentIdIdx = headerRow.indexOf('parentId');
-      const categoryIdx = headerRow.indexOf('category');
-      const assigneeIdx = headerRow.indexOf('assignee');
-      const statusIdx = headerRow.indexOf('status');
-      const estimateIdx = headerRow.indexOf('estimate');
-      const startDateIdx = headerRow.indexOf('startDate');
-      const progressIdx = headerRow.indexOf('progress');
-      const dependenciesIdx = headerRow.indexOf('dependencies');
-      const commentsIdx = headerRow.indexOf('comments');
-      const notesIdx = headerRow.indexOf('notes');
+    // Build multipart/related body with metadata and CSV content
+    const boundary = '===============7330845974216740156==';
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelimiter = `\r\n--${boundary}--`;
 
-      for (let i = 1; i < tasksData.values.length; i++) {
-        const row = tasksData.values[i];
+    const multipartBody =
+      delimiter +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(metadata) +
+      delimiter +
+      'Content-Type: text/csv; charset=UTF-8\r\n\r\n' +
+      csvContent +
+      closeDelimiter;
 
-        // Parse dependencies (CSV)
-        let dependencies: string[] = [];
-        if (row[dependenciesIdx] && row[dependenciesIdx].trim()) {
-          dependencies = row[dependenciesIdx].split(',').map((d: string) => d.trim()).filter((d: string) => d);
-        }
-
-        // Parse comments (JSON), swallow parse errors → []
-        let comments: any[] = [];
-        if (row[commentsIdx] && row[commentsIdx].trim()) {
-          try {
-            comments = JSON.parse(row[commentsIdx]);
-          } catch (e) {
-            logger.debug('Failed to parse comments, swallowing error:', e);
-            comments = [];
-          }
-        }
-
-        // Coerce estimate and progress to int
-        const estimate = parseInt(row[estimateIdx] || '0', 10) || 0;
-        const progress = parseInt(row[progressIdx] || '0', 10) || 0;
-
-        if (idIdx >= 0 && nameIdx >= 0) {
-          tasks.push({
-            id: row[idIdx] || '',
-            name: row[nameIdx] || '',
-            milestoneId: resolveMilestoneId(row[milestoneIdx] || ''),
-            parentId: row[parentIdIdx] ? row[parentIdIdx] : null,
-            category: row[categoryIdx] || '',
-            assignee: row[assigneeIdx] || '',
-            status: row[statusIdx] || '',
-            estimate,
-            startDate: row[startDateIdx] || '',
-            progress,
-            dependencies,
-            comments,
-            notes: row[notesIdx] || undefined,
-          });
-        }
-      }
-    }
-
-    const milestones: Milestone[] = milestoneOrder.map((name) => ({ id: nameToId.get(name)!, name }));
-
-    return { tasks, milestones };
-  } catch (error) {
-    logger.error('Error pulling from sheet:', error);
-    throw error;
-  }
-}
-
-/**
- * Push (write) tasks and milestones to a Google Sheet using values:batchUpdate.
- * Everything lives in a single 'Tasks' tab: each task row carries its milestone
- * as a plain text name in a 'milestone' column (looked up via task.milestoneId),
- * the same way 'assignee' or 'category' are plain values — there is no separate
- * milestoneId/Milestones tab to keep in sync.
- *
- * @param spreadsheetId Google Sheets spreadsheet ID
- * @param token OAuth access token
- * @param tasks Array of tasks to write
- * @param milestones Array of milestones, used to resolve each task's milestoneId to a name
- * @returns result object with success and message
- */
-export async function pushToSheet(
-  spreadsheetId: string,
-  token: string,
-  tasks: Task[],
-  milestones: Milestone[]
-): Promise<{ success: boolean; message: string }> {
-  spreadsheetId = spreadsheetId.trim();
-  try {
-    // Ensure the tab exists first
-    await ensureSheetTabs(spreadsheetId, token);
-
-    const milestoneIdToName = new Map(milestones.map((m) => [m.id, m.name]));
-
-    // Build Tasks data with fixed column order (same as pullFromSheet expects)
-    const taskHeaders = [
-      'id',
-      'name',
-      'milestone',
-      'parentId',
-      'category',
-      'assignee',
-      'status',
-      'estimate',
-      'startDate',
-      'progress',
-      'dependencies',
-      'comments',
-      'notes',
-    ];
-
-    const taskRows: any[][] = [taskHeaders];
-    tasks.forEach((task) => {
-      taskRows.push([
-        task.id || '',
-        task.name || '',
-        (task.milestoneId && milestoneIdToName.get(task.milestoneId)) || '',
-        task.parentId || '',
-        task.category || '',
-        task.assignee || '',
-        task.status || '',
-        task.estimate || 0,
-        task.startDate || '',
-        task.progress || 0,
-        task.dependencies ? task.dependencies.join(',') : '',
-        task.comments ? JSON.stringify(task.comments) : '',
-        task.notes || '',
-      ]);
-    });
-
-    // Upload data to the single tab via batchUpdate
-    const batchUpdateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`;
-    const batchUpdateResponse = await fetch(batchUpdateUrl, {
+    const uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+    const uploadResponse = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        'Content-Type': `multipart/related; boundary=${boundary}`,
       },
-      body: JSON.stringify({
-        valueInputOption: 'RAW',
-        data: [
-          {
-            range: 'Tasks!A1',
-            values: taskRows,
-          },
-        ],
-      }),
+      body: multipartBody,
     });
 
-    if (!batchUpdateResponse.ok) {
-      const errorText = await batchUpdateResponse.text();
-      if (batchUpdateResponse.status === 403 && isScopeInsufficientError(errorText)) {
-        clearToken();
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      if (uploadResponse.status === 403 && isScopeInsufficientError(errorText)) {
+        clearToken(projectId);
       }
-      throw new Error(`Failed to push to sheet: ${batchUpdateResponse.status} - ${errorText}`);
+      throw new Error(`Failed to create CSV file: ${uploadResponse.status} - ${errorText}`);
     }
 
-    logger.info(`Pushed ${tasks.length} tasks and ${milestones.length} milestones to sheet`);
-    return {
-      success: true,
-      message: `Pushed ${tasks.length} tasks and ${milestones.length} milestones successfully`,
-    };
+    const uploadData = await uploadResponse.json();
+    logger.info(`Created CSV file "${filename}": ${uploadData.id}`);
+    return uploadData.id;
   } catch (error) {
-    logger.error('Error pushing to sheet:', error);
-    return {
-      success: false,
-      message: `Push failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
+    logger.error('Error in createDriveCsvFile:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing CSV file in Google Drive.
+ * Uses media upload to replace the file content.
+ *
+ * @param fileId ID of the file to update
+ * @param csvContent New CSV content as string
+ * @param token OAuth access token
+ * @param projectId Project ID (for clearing token on auth failures)
+ */
+export async function updateDriveCsvFile(
+  fileId: string,
+  csvContent: string,
+  token: string,
+  projectId: string
+): Promise<void> {
+  try {
+    const uploadUrl = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`;
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'text/csv',
+      },
+      body: csvContent,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      if (uploadResponse.status === 403 && isScopeInsufficientError(errorText)) {
+        clearToken(projectId);
+      }
+      throw new Error(`Failed to update CSV file: ${uploadResponse.status} - ${errorText}`);
+    }
+
+    logger.info(`Updated CSV file: ${fileId}`);
+  } catch (error) {
+    logger.error('Error in updateDriveCsvFile:', error);
+    throw error;
+  }
+}
+
+/**
+ * Retrieve CSV content from a Google Drive file.
+ * Returns null if the file is not found (404).
+ *
+ * @param fileId ID of the file to retrieve
+ * @param token OAuth access token
+ * @param projectId Project ID (for clearing token on auth failures)
+ * @returns CSV content as string, or null if not found
+ */
+export async function getDriveCsvContent(fileId: string, token: string, projectId: string): Promise<string | null> {
+  try {
+    const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+    const downloadResponse = await fetch(downloadUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (downloadResponse.status === 404) {
+      logger.info(`CSV file not found: ${fileId}`);
+      return null;
+    }
+
+    if (!downloadResponse.ok) {
+      const errorText = await downloadResponse.text();
+      if (downloadResponse.status === 403 && isScopeInsufficientError(errorText)) {
+        clearToken(projectId);
+      }
+      throw new Error(`Failed to retrieve CSV file: ${downloadResponse.status} - ${errorText}`);
+    }
+
+    const content = await downloadResponse.text();
+    logger.debug(`Retrieved CSV file: ${fileId}`);
+    return content;
+  } catch (error) {
+    logger.error('Error in getDriveCsvContent:', error);
+    throw error;
+  }
+}
+
+/**
+ * Connect to Google Drive by creating the app folder structure and seeding
+ * a CSV file with the current state of tasks and milestones.
+ * Called once when the user clicks "Connect to Google Drive" in Settings.
+ *
+ * @param token OAuth access token
+ * @param currentTasks Array of tasks to seed the CSV file with
+ * @param currentMilestones Array of milestones to seed the CSV file with
+ * @param projectNameForFilename Project name to use for the CSV filename
+ * @param projectId Project ID
+ * @returns The new file's driveFileId
+ */
+export async function connectDriveSync(
+  token: string,
+  currentTasks: Task[],
+  currentMilestones: Milestone[],
+  projectNameForFilename: string,
+  projectId: string
+): Promise<string> {
+  try {
+    // 1. Ensure app folder structure (OpenWebApp/Planning) exists
+    const folderId = await ensureAppFolder(token, projectId);
+
+    // 2. Get CSV filename from project name
+    const filename = getCSVFilename(projectNameForFilename);
+
+    // 3. Build CSV content from current tasks and milestones
+    const csvContent = buildTasksCsvString(currentTasks, currentMilestones);
+
+    // 4. Create the CSV file in Google Drive
+    const driveFileId = await createDriveCsvFile(filename, csvContent, folderId, token, projectId);
+
+    // 5. Return the file ID to be stored in Project.driveFileId
+    logger.info(`Connected to Google Drive and created CSV file: ${driveFileId}`);
+    return driveFileId;
+  } catch (error) {
+    logger.error('Error in connectDriveSync:', error);
+    throw error;
   }
 }

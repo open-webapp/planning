@@ -1,7 +1,6 @@
 import type { Task, Milestone, Project, Comment, SyncConflict } from './types'
 import { uid } from './seed'
 import { TODAY } from './dates'
-import { pushToSheet } from './googleAuth'
 import { exportTasksCsv } from './csv'
 
 export interface AppState {
@@ -11,13 +10,9 @@ export interface AppState {
   projects: Project[]
   savedProjects: { [projectId: string]: ProjectState } // per-project snapshots for inactive projects
 
-  // Google Auth & Backup
-  googleClientId?: string // optional, from env (decision 5/6)
-  googleAccessToken?: string
-  googleUserEmail?: string
-  googleStatus?: string // 'connected' | 'disconnected'
+  // Google Auth & Backup (per-project, see Project type)
   googleBusy: boolean
-  lastSyncedAt?: string // project-level, but tracked in app state too
+  googleStatus?: string // 'connecting' | 'disconnecting' | error message
 
   // Sync State
   syncBusy: boolean // replaces conditionally reusing googleBusy
@@ -146,13 +141,10 @@ export function snapshotForPersist(state: AppState): Partial<AppState> {
   PERSIST_STATE_KEYS.forEach(k => {
     (snap as any)[k] = (state as any)[k]
   })
-  // Add global state fields
+  // Add global state fields (note: auth tokens are per-project, stored separately in googleAuth.ts)
   snap.projects = state.projects
   snap.activeProjectId = state.activeProjectId
   snap.activeView = state.activeView
-  snap.googleAccessToken = state.googleAccessToken
-  snap.googleUserEmail = state.googleUserEmail
-  snap.googleStatus = state.googleStatus
   return snap
 }
 
@@ -242,7 +234,7 @@ export function createProject(
     id: projectId,
     name,
     color: color || 'netskopeBlue',
-    spreadsheetId: null,
+    driveFileId: undefined,
     lastSyncedSnapshot: null,
     lastSyncedAt: null,
   }
@@ -897,7 +889,7 @@ export function updateProject(
 
 /**
  * Delete a project with backup.
- * Prompts user for confirmation, backs up tasks/milestones to Google Sheets or CSV,
+ * Prompts user for confirmation, backs up tasks/milestones to CSV,
  * then dispatches DELETE_PROJECT action.
  *
  * Logic:
@@ -905,9 +897,7 @@ export function updateProject(
  * 2. Resolve task/milestone data:
  *    - If activeProject, use state.tasks/state.milestones
  *    - Otherwise, pull from state.savedProjects[projectId]
- * 3. Backup:
- *    - If googleAccessToken + spreadsheetId: call pushToSheet
- *    - On failure or no token/id: fall back to exportTasksCsv
+ * 3. Backup tasks/milestones to CSV export
  * 4. After backup resolves: dispatch DELETE_PROJECT action
  */
 export async function deleteProjectWithBackup(
@@ -949,32 +939,12 @@ export async function deleteProjectWithBackup(
   }
 
   // Step 3: Backup strategy
-  let backupSucceeded = false
-
-  if (state.googleAccessToken && project.spreadsheetId) {
-    // Try Google Sheets backup first
-    try {
-      const result = await pushToSheet(project.spreadsheetId, state.googleAccessToken, tasks, milestones)
-      if (result.success) {
-        backupSucceeded = true
-        console.log('Project backed up to Google Sheets:', result.message)
-      } else {
-        console.warn('Google Sheets backup failed:', result.message)
-      }
-    } catch (error) {
-      console.warn('Google Sheets backup error:', error)
-    }
-  }
-
-  // If Google Sheets backup failed or no token/spreadsheetId, fall back to CSV
-  if (!backupSucceeded) {
-    try {
-      exportTasksCsv(tasks, milestones, project.name)
-      console.log('Project backed up to CSV')
-    } catch (error) {
-      console.error('CSV backup error:', error)
-      // Continue to delete anyway (user already confirmed)
-    }
+  try {
+    exportTasksCsv(tasks, milestones, project.name)
+    console.log('Project backed up to CSV')
+  } catch (error) {
+    console.error('CSV backup error:', error)
+    // Continue to delete anyway (user already confirmed)
   }
 
   // Step 4: Delete the project via dispatch
@@ -1008,15 +978,18 @@ export function closeSettings(state: AppState): AppState {
 }
 
 /**
- * Revoke Google token and clear auth state.
+ * Clear Google auth for the active project (token is removed in googleAuth.ts).
  */
-export function revokeGoogleToken(state: AppState): AppState {
+export function clearProjectGoogleAuth(state: AppState): AppState {
   return {
     ...state,
-    googleAccessToken: undefined,
-    googleUserEmail: undefined,
-    googleStatus: 'disconnected',
+    projects: state.projects.map(p =>
+      p.id === state.activeProjectId
+        ? { ...p, googleAccessToken: undefined, googleUserEmail: undefined }
+        : p
+    ),
     googleBusy: false,
+    googleStatus: undefined,
   }
 }
 

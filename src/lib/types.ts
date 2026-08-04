@@ -30,15 +30,17 @@ export interface Project {
   id: string
   name: string
   color: string // hex or Tailwind color name
-  spreadsheetId: string | null
+  driveFileId: string | undefined
   lastSyncedSnapshot: string | null // JSON-serialized { tasks: Task[]; milestones: Milestone[] } as of last sync
   lastSyncedAt: string | null
+  googleAccessToken?: string // per-project OAuth token
+  googleUserEmail?: string // per-project user email
 }
 
 export interface SyncConflict {
   taskId: string
   taskName: string // for display in case task was renamed on both sides — use browser-side name
-  field: keyof Task
+  field: keyof Task | '__deleted' // '__deleted' is a pseudo-field marking a deletion-vs-edit conflict
   browserValue: unknown
-  sheetValue: unknown
+  driveValue: unknown
 }

@@ -1,12 +1,17 @@
 import { describe, it, expect, vi } from 'vitest'
-import { diffAgainstSnapshot, threeWayMerge, applyResolutions, syncNow } from './sync'
+import { diffAgainstSnapshot, threeWayMerge, applyResolutions, syncNow, resolveSyncConflicts } from './sync'
 import type { Task, Milestone } from './types'
 import type { AppState } from './state'
 
 vi.mock('./googleAuth', () => ({
   getAccessToken: vi.fn().mockResolvedValue('fake-token'),
-  pullFromSheet: vi.fn().mockResolvedValue({ tasks: [], milestones: [] }),
-  pushToSheet: vi.fn().mockResolvedValue({ success: false, message: 'Push failed: 403 - forbidden' }),
+  getDriveCsvContent: vi.fn().mockResolvedValue(null),
+  updateDriveCsvFile: vi.fn().mockRejectedValue(new Error('Push failed: 403 - forbidden')),
+}))
+
+vi.mock('./csv', () => ({
+  parseTasksCsvString: vi.fn().mockReturnValue({ tasks: [], milestones: [] }),
+  buildTasksCsvString: vi.fn().mockReturnValue(''),
 }))
 
 // Helper to create a test task
@@ -142,11 +147,11 @@ describe('sync engine', () => {
   })
 
   /**
-   * Test 4: Single-field conflict, pick sheet
+   * Test 4: Single-field conflict, pick drive
    * Same task+field changed differently on both sides
-   * → one SyncConflict emitted; applyResolutions with {[key]: 'sheet'} yields sheet value.
+   * → one SyncConflict emitted; applyResolutions with {[key]: 'drive'} yields drive value.
    */
-  it('test 4: single-field conflict, pick sheet', () => {
+  it('test 4: single-field conflict, pick drive', () => {
     const snapshot = {
       tasks: [createTask('a', { name: 'Original Name' })],
       milestones: [],
@@ -170,11 +175,11 @@ describe('sync engine', () => {
     expect(conflicts).toHaveLength(1)
     expect(conflicts[0].field).toBe('name')
     expect(conflicts[0].browserValue).toBe('Browser Name')
-    expect(conflicts[0].sheetValue).toBe('Sheet Name')
+    expect(conflicts[0].driveValue).toBe('Sheet Name')
 
-    // Apply resolution: pick sheet
+    // Apply resolution: pick drive
     const resolved = applyResolutions(merged, conflicts, {
-      'a:name': 'sheet',
+      'a:name': 'drive',
     })
 
     expect(resolved.tasks[0].name).toBe('Sheet Name')
@@ -256,9 +261,9 @@ describe('sync engine', () => {
     expect(conflicts).toHaveLength(2)
     expect(conflicts.map(c => c.taskId).sort()).toEqual(['a', 'b'])
 
-    // Resolve: task A picks sheet, task B picks browser, task C stays (no conflict)
+    // Resolve: task A picks drive, task B picks browser, task C stays (no conflict)
     const resolved = applyResolutions(merged, conflicts, {
-      'a:name': 'sheet',
+      'a:name': 'drive',
       'b:status': 'browser',
     })
 
@@ -586,13 +591,13 @@ describe('sync engine', () => {
     expect(merged.tasks.find(t => t.id === 'd')?.name).toBe('D New') // browser added
   })
 
-  it('does not wipe browser tasks when the sheet pull comes back empty despite an existing snapshot', async () => {
-    // Reproduces the reported bug: pullFromSheet returning {tasks: [], milestones: []} for a
+  it('does not wipe browser tasks when the Drive pull comes back empty despite an existing snapshot', async () => {
+    // Reproduces the reported bug: getDriveCsvContent returning null for a
     // project that has synced before (non-empty lastSyncedSnapshot) used to make threeWayMerge
-    // treat every task as "deleted on the sheet side" and wipe them from the browser too.
-    const { pullFromSheet, pushToSheet } = await import('./googleAuth')
-    vi.mocked(pullFromSheet).mockResolvedValueOnce({ tasks: [], milestones: [] })
-    vi.mocked(pushToSheet).mockResolvedValueOnce({ success: true, message: 'ok' })
+    // treat every task as "deleted on the Drive side" and wipe them from the browser too.
+    const { getDriveCsvContent, updateDriveCsvFile } = await import('./googleAuth')
+    vi.mocked(getDriveCsvContent).mockResolvedValueOnce(null)
+    vi.mocked(updateDriveCsvFile).mockResolvedValueOnce(undefined)
 
     const existingTasks = [createTask('a'), createTask('b')]
     const snapshot = { tasks: existingTasks, milestones: [] }
@@ -604,7 +609,7 @@ describe('sync engine', () => {
           id: 'p1',
           name: 'Project 1',
           color: '#000',
-          spreadsheetId: 'sheet-1',
+          driveFileId: 'drive-file-1',
           lastSyncedSnapshot: JSON.stringify(snapshot),
           lastSyncedAt: '2026-08-01T00:00:00.000Z',
         },
@@ -621,7 +626,24 @@ describe('sync engine', () => {
     expect(successCall![0].tasks.map((t: Task) => t.id).sort()).toEqual(['a', 'b'])
   })
 
-  it('reports SYNC_ERROR instead of SYNC_SUCCESS when the sheet push fails', async () => {
+  it('resolveSyncConflicts applies "drive" choices and pushes the resolved data (accept-drive did nothing before this fix)', async () => {
+    const { updateDriveCsvFile } = await import('./googleAuth')
+    vi.mocked(updateDriveCsvFile).mockResolvedValueOnce(undefined)
+
+    const pendingMerge = {
+      tasks: [createTask('a', { name: 'Browser Name', status: 'In Progress' })],
+      milestones: [],
+    }
+    const conflicts = [
+      {
+        taskId: 'a',
+        taskName: 'Browser Name',
+        field: 'name' as const,
+        browserValue: 'Browser Name',
+        driveValue: 'Drive Name',
+      },
+    ]
+
     const state: AppState = {
       activeProjectId: 'p1',
       projects: [
@@ -629,7 +651,227 @@ describe('sync engine', () => {
           id: 'p1',
           name: 'Project 1',
           color: '#000',
-          spreadsheetId: 'sheet-1',
+          driveFileId: 'drive-file-1',
+          lastSyncedSnapshot: null,
+          lastSyncedAt: null,
+        },
+      ],
+      tasks: pendingMerge.tasks,
+      milestones: [],
+      syncPendingMerge: pendingMerge,
+      syncConflicts: conflicts,
+    } as unknown as AppState
+
+    const dispatch = vi.fn()
+    await resolveSyncConflicts(state, dispatch, { 'a:name': 'drive' })
+
+    const successCall = dispatch.mock.calls.find(call => call[0].type === 'SYNC_SUCCESS')
+    expect(successCall).toBeDefined()
+    expect(successCall![0].tasks.find((t: Task) => t.id === 'a')?.name).toBe('Drive Name')
+
+    const errorCall = dispatch.mock.calls.find(call => call[0].type === 'SYNC_ERROR')
+    expect(errorCall).toBeUndefined()
+  })
+
+  /**
+   * Phase 4: Bulk conflict resolution (>5 conflicts)
+   *
+   * Test 12: Round-trip with 6 field conflicts (no deletions)
+   * 6 tasks, each with one field conflicted on both sides.
+   * → threeWayMerge returns 6 conflicts; applyResolutions with all choices
+   * set to 'drive' yields all sheet-side values; all 'browser' yields all
+   * browser-side values.
+   */
+  it('test 12: bulk round-trip with 6 field conflicts (no deletions)', () => {
+    const taskIds = ['a', 'b', 'c', 'd', 'e', 'f']
+
+    const snapshot = {
+      tasks: taskIds.map(id => createTask(id, { name: `Task ${id}`, status: 'Not Started' })),
+      milestones: [],
+    }
+
+    const browserCurrent = {
+      tasks: taskIds.map(id => createTask(id, { name: `Task ${id}`, status: `Browser-${id}` })),
+      milestones: [],
+    }
+
+    const sheetCurrent = {
+      tasks: taskIds.map(id => createTask(id, { name: `Task ${id}`, status: `Sheet-${id}` })),
+      milestones: [],
+    }
+
+    const browserChanges = diffAgainstSnapshot(browserCurrent, snapshot)
+    const sheetChanges = diffAgainstSnapshot(sheetCurrent, snapshot)
+
+    const { merged, conflicts } = threeWayMerge(browserChanges, sheetChanges, snapshot, browserCurrent, sheetCurrent)
+
+    expect(conflicts).toHaveLength(6)
+    expect(conflicts.map(c => c.taskId).sort()).toEqual(taskIds)
+
+    // Bulk-accept sheet (drive) version for all conflicts
+    const driveChoices: { [key: string]: 'drive' | 'browser' } = {}
+    conflicts.forEach(c => {
+      driveChoices[`${c.taskId}:${c.field}`] = 'drive'
+    })
+    const resolvedDrive = applyResolutions(merged, conflicts, driveChoices)
+    taskIds.forEach(id => {
+      const task = resolvedDrive.tasks.find(t => t.id === id)
+      expect(task?.status).toBe(`Sheet-${id}`)
+    })
+
+    // Bulk-accept browser version for all conflicts
+    const browserChoices: { [key: string]: 'drive' | 'browser' } = {}
+    conflicts.forEach(c => {
+      browserChoices[`${c.taskId}:${c.field}`] = 'browser'
+    })
+    const resolvedBrowser = applyResolutions(merged, conflicts, browserChoices)
+    taskIds.forEach(id => {
+      const task = resolvedBrowser.tasks.find(t => t.id === id)
+      expect(task?.status).toBe(`Browser-${id}`)
+    })
+  })
+
+  /**
+   * Test 13: Mixed bulk conflicts (6 field conflicts + 1 deletion conflict)
+   * 5 tasks with field conflicts + 1 task with a deletion conflict (browser
+   * deletes, sheet edits). Bulk resolution should apply the chosen side to
+   * every field conflict while leaving the deleted-but-edited task present
+   * (the '__deleted' pseudo-field is skipped as a no-op).
+   */
+  it('test 13: mixed bulk conflicts (5 field conflicts + 1 deletion conflict)', () => {
+    const fieldTaskIds = ['a', 'b', 'c', 'd', 'e']
+    const deletedTaskId = 'z'
+
+    const snapshot = {
+      tasks: [
+        ...fieldTaskIds.map(id => createTask(id, { name: `Task ${id}`, status: 'Not Started' })),
+        createTask(deletedTaskId, { name: 'Task Z', status: 'Not Started' }),
+      ],
+      milestones: [],
+    }
+
+    const browserCurrent = {
+      tasks: [
+        ...fieldTaskIds.map(id => createTask(id, { name: `Task ${id}`, status: `Browser-${id}` })),
+        // browser deleted task z (not present)
+      ],
+      milestones: [],
+    }
+
+    const sheetCurrent = {
+      tasks: [
+        ...fieldTaskIds.map(id => createTask(id, { name: `Task ${id}`, status: `Sheet-${id}` })),
+        createTask(deletedTaskId, { name: 'Task Z Edited', status: 'Done' }), // sheet edited task z
+      ],
+      milestones: [],
+    }
+
+    const browserChanges = diffAgainstSnapshot(browserCurrent, snapshot)
+    const sheetChanges = diffAgainstSnapshot(sheetCurrent, snapshot)
+
+    const { merged, conflicts } = threeWayMerge(browserChanges, sheetChanges, snapshot, browserCurrent, sheetCurrent)
+
+    // 5 field conflicts + 1 deletion conflict
+    expect(conflicts).toHaveLength(6)
+    const deletionConflict = conflicts.find(c => c.taskId === deletedTaskId)
+    expect(deletionConflict).toBeDefined()
+    expect(deletionConflict?.field).toBe('__deleted')
+
+    // Bulk-resolve: 'drive' for all non-deletion conflicts, skip the deletion conflict
+    // (mirrors handleBulkAcceptDrive/handleBulkAcceptBrowser in SyncConflictOverlay.tsx)
+    const driveChoices: { [key: string]: 'drive' | 'browser' } = {}
+    conflicts.forEach(c => {
+      if (c.field === '__deleted') return
+      driveChoices[`${c.taskId}:${c.field}`] = 'drive'
+    })
+    const resolvedDrive = applyResolutions(merged, conflicts, driveChoices)
+
+    fieldTaskIds.forEach(id => {
+      const task = resolvedDrive.tasks.find(t => t.id === id)
+      expect(task?.status).toBe(`Sheet-${id}`)
+    })
+    // Deleted-but-edited task is still present (kept via mergeTask, '__deleted' is a no-op)
+    const keptTaskDrive = resolvedDrive.tasks.find(t => t.id === deletedTaskId)
+    expect(keptTaskDrive).toBeDefined()
+    expect(keptTaskDrive?.name).toBe('Task Z Edited')
+
+    // Bulk-resolve: 'browser' for all non-deletion conflicts
+    const browserChoices: { [key: string]: 'drive' | 'browser' } = {}
+    conflicts.forEach(c => {
+      if (c.field === '__deleted') return
+      browserChoices[`${c.taskId}:${c.field}`] = 'browser'
+    })
+    const resolvedBrowser = applyResolutions(merged, conflicts, browserChoices)
+
+    fieldTaskIds.forEach(id => {
+      const task = resolvedBrowser.tasks.find(t => t.id === id)
+      expect(task?.status).toBe(`Browser-${id}`)
+    })
+    const keptTaskBrowser = resolvedBrowser.tasks.find(t => t.id === deletedTaskId)
+    expect(keptTaskBrowser).toBeDefined()
+    expect(keptTaskBrowser?.name).toBe('Task Z Edited')
+  })
+
+  /**
+   * Test 14: Regression check - 5-or-fewer conflicts still apply per-conflict
+   * resolutions correctly (individual UI path, not bulk).
+   */
+  it('test 14: regression - 3 conflicts resolved individually still work', () => {
+    const snapshot = {
+      tasks: [
+        createTask('a', { name: 'A', status: 'Not Started' }),
+        createTask('b', { name: 'B', status: 'Not Started' }),
+        createTask('c', { name: 'C', status: 'Not Started' }),
+      ],
+      milestones: [],
+    }
+
+    const browserCurrent = {
+      tasks: [
+        createTask('a', { name: 'A Browser', status: 'Not Started' }),
+        createTask('b', { name: 'B', status: 'Browser Status' }),
+        createTask('c', { name: 'C Browser', status: 'Not Started' }),
+      ],
+      milestones: [],
+    }
+
+    const sheetCurrent = {
+      tasks: [
+        createTask('a', { name: 'A Sheet', status: 'Not Started' }),
+        createTask('b', { name: 'B', status: 'Sheet Status' }),
+        createTask('c', { name: 'C Sheet', status: 'Not Started' }),
+      ],
+      milestones: [],
+    }
+
+    const browserChanges = diffAgainstSnapshot(browserCurrent, snapshot)
+    const sheetChanges = diffAgainstSnapshot(sheetCurrent, snapshot)
+
+    const { merged, conflicts } = threeWayMerge(browserChanges, sheetChanges, snapshot, browserCurrent, sheetCurrent)
+
+    expect(conflicts).toHaveLength(3)
+
+    // Individually resolve: a -> drive, b -> browser, c -> drive
+    const resolved = applyResolutions(merged, conflicts, {
+      'a:name': 'drive',
+      'b:status': 'browser',
+      'c:name': 'drive',
+    })
+
+    expect(resolved.tasks.find(t => t.id === 'a')?.name).toBe('A Sheet')
+    expect(resolved.tasks.find(t => t.id === 'b')?.status).toBe('Browser Status')
+    expect(resolved.tasks.find(t => t.id === 'c')?.name).toBe('C Sheet')
+  })
+
+  it('reports SYNC_ERROR when the Drive push fails', async () => {
+    const state: AppState = {
+      activeProjectId: 'p1',
+      projects: [
+        {
+          id: 'p1',
+          name: 'Project 1',
+          color: '#000',
+          driveFileId: 'drive-file-1',
           lastSyncedSnapshot: null,
           lastSyncedAt: null,
         },
@@ -644,5 +886,9 @@ describe('sync engine', () => {
     const dispatchedTypes = dispatch.mock.calls.map(call => call[0].type)
     expect(dispatchedTypes).toContain('SYNC_ERROR')
     expect(dispatchedTypes).not.toContain('SYNC_SUCCESS')
+
+    const errorCall = dispatch.mock.calls.find(call => call[0].type === 'SYNC_ERROR')
+    expect(errorCall).toBeDefined()
+    expect(errorCall![0].error).toContain('Push failed')
   })
 })

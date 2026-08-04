@@ -1,113 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-describe('pullFromSheet', () => {
-  beforeEach(() => {
-    vi.resetModules()
-  })
-
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
-  it('returns null (treats as first-ever sync) when tabs do not exist yet, surfaced as 400 INVALID_ARGUMENT', async () => {
-    // Reproduces the reported bug: a spreadsheet that exists but only has the default
-    // 'Sheet1' tab fails the Tasks/Milestones range batchGet with 400, not 404 — and the
-    // old code only special-cased 404/403, so it threw instead of treating this as "no data yet".
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 400,
-        text: async () =>
-          JSON.stringify({
-            error: {
-              code: 400,
-              message: 'Unable to parse range: Tasks!A:Z',
-              status: 'INVALID_ARGUMENT',
-            },
-          }),
-      })
-    )
-
-    const { pullFromSheet } = await import('./googleAuth')
-    const result = await pullFromSheet('sheet-id', 'fake-token')
-
-    expect(result).toBeNull()
-  })
-
-  it('still throws, with the response body included, for other 400 errors', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 400,
-        text: async () =>
-          JSON.stringify({
-            error: { code: 400, message: 'Invalid spreadsheet ID', status: 'INVALID_ARGUMENT' },
-          }),
-      })
-    )
-
-    const { pullFromSheet } = await import('./googleAuth')
-
-    await expect(pullFromSheet('sheet-id', 'fake-token')).rejects.toThrow('Invalid spreadsheet ID')
-  })
-
-  it('reads milestone as a plain text column (not milestoneId) from a single Tasks tab', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          valueRanges: [
-            {
-              values: [
-                ['id', 'name', 'milestone', 'parentId', 'category', 'assignee', 'status', 'estimate', 'startDate', 'progress', 'dependencies', 'comments', 'notes'],
-                ['t1', 'Task One', 'Launch', '', 'Default', 'Alice', 'Not Started', '3', '2026-08-01', '0', '', '', ''],
-              ],
-            },
-          ],
-        }),
-      })
-    )
-
-    const { pullFromSheet } = await import('./googleAuth')
-    const result = await pullFromSheet('sheet-id', 'fake-token')
-
-    expect(result).not.toBeNull()
-    expect(result!.milestones).toHaveLength(1)
-    expect(result!.milestones[0].name).toBe('Launch')
-    expect(result!.tasks[0].milestoneId).toBe(result!.milestones[0].id)
-  })
-
-  it('reuses an existing milestone id for a matching name instead of minting a new one', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          valueRanges: [
-            {
-              values: [
-                ['id', 'name', 'milestone', 'parentId', 'category', 'assignee', 'status', 'estimate', 'startDate', 'progress', 'dependencies', 'comments', 'notes'],
-                ['t1', 'Task One', 'Launch', '', '', '', '', '', '', '', '', '', ''],
-              ],
-            },
-          ],
-        }),
-      })
-    )
-
-    const { pullFromSheet } = await import('./googleAuth')
-    const result = await pullFromSheet('sheet-id', 'fake-token', [{ id: 'm-existing', name: 'Launch' }])
-
-    expect(result!.milestones).toEqual([{ id: 'm-existing', name: 'Launch' }])
-    expect(result!.tasks[0].milestoneId).toBe('m-existing')
-  })
-})
-
 describe('requestAccessToken', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -138,7 +30,7 @@ describe('requestAccessToken', () => {
       requestAccessToken: vi.fn(),
     })
 
-    const promise = requestAccessToken(['https://www.googleapis.com/auth/spreadsheets'])
+    const promise = requestAccessToken('p-test', ['https://www.googleapis.com/auth/spreadsheets'])
 
     // Script hasn't loaded yet: window.google is still undefined at this point.
     expect((window as any).google).toBeUndefined()
@@ -162,7 +54,7 @@ describe('requestAccessToken', () => {
     vi.useFakeTimers()
     const { requestAccessToken } = await import('./googleAuth')
 
-    const promise = requestAccessToken(['https://www.googleapis.com/auth/spreadsheets'])
+    const promise = requestAccessToken('p-test', ['https://www.googleapis.com/auth/spreadsheets'])
     // Prevent an unhandled rejection warning while we advance timers below.
     const assertion = expect(promise).rejects.toThrow(
       'Google Identity Services failed to load. Check your connection and try again.'

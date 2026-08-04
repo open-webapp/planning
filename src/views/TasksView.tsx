@@ -132,7 +132,6 @@ const TasksView: React.FC<TasksViewProps> = ({
   }
 
   const totalWidth = columns.reduce((sum, col) => sum + getColumnWidth(col.name), 0)
-  const visibleCount = Object.keys(rowMap.rowNumberMap).length
 
   return (
     <div
@@ -141,13 +140,6 @@ const TasksView: React.FC<TasksViewProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      <h2 className="mb-s5" style={{ fontSize: '1.75rem', fontWeight: 400, color: 'var(--ns-fg-1)', margin: '0 0 16px' }}>
-        Tasks{' '}
-        <span className="font-normal text-fg-3" style={{ fontSize: '0.875rem' }}>
-          ({visibleCount} shown)
-        </span>
-      </h2>
-
       <div className="bg-white border border-border rounded-lg overflow-x-auto">
         <div style={{ minWidth: `${totalWidth}px` }}>
           {/* Header */}

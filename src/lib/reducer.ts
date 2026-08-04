@@ -127,12 +127,24 @@ export function appReducer(state: AppState, action: Action): AppState {
     case 'SET_SETTINGS_TAB':
       return StateActions.setSettingsTab(state, action.tab)
 
-    // Google Auth (Phase 6 implementation)
+    // Google Auth (per-project)
     case 'REQUEST_GOOGLE_TOKEN':
       return { ...state, googleBusy: true, googleStatus: 'Connecting...' }
 
+    case 'SET_GOOGLE_TOKEN':
+      return {
+        ...state,
+        projects: state.projects.map(p =>
+          p.id === state.activeProjectId
+            ? { ...p, googleAccessToken: action.token, googleUserEmail: action.email }
+            : p
+        ),
+        googleStatus: undefined,
+        googleBusy: false,
+      }
+
     case 'REVOKE_GOOGLE_TOKEN':
-      return StateActions.revokeGoogleToken(state)
+      return StateActions.clearProjectGoogleAuth(state)
 
     case 'SYNC_STARTED':
       return { ...state, syncBusy: true, syncStatus: undefined, syncConflicts: [] }
@@ -143,6 +155,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         syncBusy: false,
         syncConflicts: action.conflicts,
         syncPendingMerge: action.merged,
+        settingsOpen: false,
       }
 
     case 'SYNC_RESOLVE_CONFLICTS':
@@ -191,9 +204,6 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case 'CLEAR_SYNC_STATUS':
       return { ...state, syncStatus: undefined }
-
-    case 'SET_GOOGLE_TOKEN':
-      return { ...state, googleAccessToken: action.token, googleUserEmail: action.email, googleStatus: 'connected', googleBusy: false }
 
     case 'GOOGLE_TOKEN_ERROR':
       return { ...state, googleBusy: false, googleStatus: action.error }

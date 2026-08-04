@@ -1,8 +1,10 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 import { X, Loader, Trash2 } from 'lucide-react'
 import type { AppState } from '../lib/state'
 import { syncNow } from '../lib/sync'
 import { parseSyncError } from '../lib/syncErrors'
+import { connectDriveSync } from '../lib/googleAuth'
+import { exportTasksCsv } from '../lib/csv'
 
 interface SettingsOverlayProps {
   state: AppState
@@ -23,23 +25,27 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
     e.stopPropagation()
   }
 
-  const handleSpreadsheetIdChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const activeProject = state.projects.find((p) => p.id === state.activeProjectId)
-      if (activeProject) {
-        const rawValue = e.target.value
-        // Users often paste the full sheet URL rather than just the ID; extract it if so.
-        const urlMatch = rawValue.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)
-        const spreadsheetId = (urlMatch ? urlMatch[1] : rawValue).trim()
-        dispatch({
-          type: 'UPDATE_PROJECT',
-          projectId: state.activeProjectId,
-          patch: { spreadsheetId: spreadsheetId || null },
-        })
-      }
-    },
-    [dispatch, state.activeProjectId, state.projects]
-  )
+  const handleConnectDrive = useCallback(async () => {
+    const activeProject = state.projects.find((p) => p.id === state.activeProjectId)
+    if (!activeProject || !activeProject.googleAccessToken) return
+
+    try {
+      const driveFileId = await connectDriveSync(
+        activeProject.googleAccessToken,
+        state.tasks,
+        state.milestones,
+        activeProject.name,
+        activeProject.id
+      )
+      dispatch({
+        type: 'UPDATE_PROJECT',
+        projectId: activeProject.id,
+        patch: { driveFileId }
+      })
+    } catch (error) {
+      console.error('Drive sync connection failed:', error)
+    }
+  }, [state, dispatch])
 
   const handleConnectGoogle = useCallback(() => {
     // Phase 6: requestAccessToken() from lib/googleAuth.ts
@@ -73,9 +79,35 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
     [onDeleteProject]
   )
 
+  const handleDownloadCsv = useCallback(() => {
+    const activeProject = state.projects.find((p) => p.id === state.activeProjectId)
+    if (activeProject) {
+      exportTasksCsv(state.tasks, state.milestones, activeProject.name)
+    }
+  }, [state])
+
   const activeProject = state.projects.find((p) => p.id === state.activeProjectId)
-  const isConnected = !!state.googleAccessToken
-  const canBackup = state.googleAccessToken && activeProject?.spreadsheetId
+  const isConnected = !!activeProject?.googleAccessToken
+  const canBackup = activeProject?.googleAccessToken && activeProject?.driveFileId
+
+  // Auto-provision the Drive file for the active project when switching to a project
+  // that's already connected but hasn't been provisioned yet.
+  // The very first connect is handled inline in App.tsx so a single "Connect Google
+  // Account" click does both steps at once.
+  const autoConnectingRef = useRef(false)
+  useEffect(() => {
+    if (
+      activeProject?.googleAccessToken &&
+      activeProject &&
+      !activeProject.driveFileId &&
+      !autoConnectingRef.current
+    ) {
+      autoConnectingRef.current = true
+      handleConnectDrive().finally(() => {
+        autoConnectingRef.current = false
+      })
+    }
+  }, [activeProject?.id, activeProject?.googleAccessToken, activeProject?.driveFileId])
 
   return (
     <>
@@ -138,7 +170,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
                 <div className="text-[0.9375rem] font-medium text-fg-1 mb-1">Data storage</div>
                 <div className="text-[0.8125rem] text-fg-3 leading-normal">
                   This project's tasks are saved automatically in your browser. Connect a Google
-                  account below to back them up to a spreadsheet, or restore from one.
+                  account below to back them up to Google Drive, or restore from there.
                 </div>
               </div>
 
@@ -161,7 +193,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
                         style={{ background: '#2BAE66' }}
                       />
                       <span className="text-[0.8125rem] text-fg-1">
-                        {state.googleUserEmail || 'Connected'}
+                        {activeProject?.googleUserEmail || 'Connected'}
                       </span>
                     </div>
                     <span
@@ -172,86 +204,108 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
                     </span>
                   </div>
                 ) : (
-                  <>
+                  <div className="flex gap-2">
                     <button
                       onClick={handleConnectGoogle}
                       className="px-4 py-2 bg-deepBlue text-white rounded-md text-[0.8125rem] cursor-pointer"
                     >
                       Connect Google Account
                     </button>
-                  </>
-                )}
-              </div>
-
-              {/* Spreadsheet Backup Section */}
-              <div>
-                <div className="text-[0.6875rem] font-semibold tracking-[0.06em] text-fg-3 mb-2 uppercase">
-                  Spreadsheet Backup{activeProject ? ` · ${activeProject.name}` : ''}
-                </div>
-
-                {/* Spreadsheet ID Input */}
-                <input
-                  type="text"
-                  value={activeProject?.spreadsheetId || ''}
-                  onChange={handleSpreadsheetIdChange}
-                  placeholder="Spreadsheet ID (from the sheet's URL)"
-                  className="w-full text-[0.8125rem] text-fg-1 border border-border rounded-md px-[10px] py-2 box-border mb-[10px]"
-                />
-
-                {/* Sync Button */}
-                <button
-                  onClick={handleSyncNow}
-                  disabled={!canBackup || state.syncBusy}
-                  className="w-full px-3 py-2 bg-deepBlue text-white rounded-md text-[0.8125rem] cursor-pointer disabled:bg-fg-3 disabled:cursor-not-allowed"
-                >
-                  Sync Now
-                </button>
-
-                {/* Last Sync Status */}
-                <div className="text-xs text-fg-3 mt-[10px]">
-                  {activeProject?.lastSyncedAt
-                    ? `Last sync: ${new Date(activeProject.lastSyncedAt).toLocaleString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}`
-                    : 'Not synced yet.'}
-                </div>
-
-                {/* Status Text */}
-                {state.syncStatus && !state.syncBusy && (() => {
-                  const isSuccess = state.syncStatus.startsWith('Synced at')
-                  const friendlyError = isSuccess ? null : parseSyncError(state.syncStatus)
-                  return (
-                    <div className={`text-xs mt-[6px] ${isSuccess ? 'text-netskopeBlue' : 'text-rose-600'}`}>
-                      {isSuccess ? state.syncStatus : friendlyError!.message}
-                      {friendlyError?.actionUrl && (
-                        <>
-                          {' '}
-                          <a
-                            href={friendlyError.actionUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="underline hover:text-rose-800"
-                          >
-                            {friendlyError.actionLabel}
-                          </a>
-                        </>
-                      )}
-                    </div>
-                  )
-                })()}
-
-                {/* Busy Spinner */}
-                {state.syncBusy && (
-                  <div className="flex items-center gap-2 mt-[6px]">
-                    <Loader size={14} className="animate-spin text-netskopeBlue" />
-                    <span className="text-xs text-fg-2">Processing...</span>
+                    <button
+                      onClick={handleDownloadCsv}
+                      className="px-4 py-2 bg-deepBlue text-white rounded-md text-[0.8125rem] cursor-pointer"
+                    >
+                      Download CSV
+                    </button>
                   </div>
                 )}
               </div>
+
+              {/* Google Drive Sync Section — only relevant once an account is connected;
+                  connecting the account auto-provisions this project's Drive file. */}
+              {isConnected && (
+              <div>
+                <div className="text-[0.6875rem] font-semibold tracking-[0.06em] text-fg-3 mb-2 uppercase">
+                  Google Drive Sync{activeProject ? ` · ${activeProject.name}` : ''}
+                </div>
+
+                {!activeProject?.driveFileId ? (
+                  // Drive file not yet provisioned for this project — auto-connect effect is running
+                  <div className="flex items-center gap-2">
+                    <Loader size={14} className="animate-spin text-netskopeBlue" />
+                    <span className="text-xs text-fg-2">Setting up Drive sync...</span>
+                  </div>
+                ) : (
+                  <>
+                    {/* Sync Button */}
+                    <button
+                      onClick={handleSyncNow}
+                      disabled={!canBackup || state.syncBusy}
+                      className="w-full px-3 py-2 bg-deepBlue text-white rounded-md text-[0.8125rem] cursor-pointer disabled:bg-fg-3 disabled:cursor-not-allowed"
+                    >
+                      Sync Now
+                    </button>
+
+                    {/* Last Sync Status */}
+                    <div className="text-xs text-fg-3 mt-[10px]">
+                      {activeProject?.lastSyncedAt
+                        ? `Last sync: ${new Date(activeProject.lastSyncedAt).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}`
+                        : 'Not synced yet.'}
+                    </div>
+
+                    {/* Link to the synced Drive file */}
+                    {activeProject?.lastSyncedAt && activeProject?.driveFileId && (
+                      <a
+                        href={`https://drive.google.com/file/d/${activeProject.driveFileId}/view`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-netskopeBlue underline mt-[4px] inline-block"
+                      >
+                        View in Google Drive
+                      </a>
+                    )}
+
+                    {/* Status Text */}
+                    {state.syncStatus && !state.syncBusy && (() => {
+                      const isSuccess = state.syncStatus.startsWith('Synced at')
+                      const friendlyError = isSuccess ? null : parseSyncError(state.syncStatus)
+                      return (
+                        <div className={`text-xs mt-[6px] ${isSuccess ? 'text-netskopeBlue' : 'text-rose-600'}`}>
+                          {isSuccess ? state.syncStatus : friendlyError!.message}
+                          {friendlyError?.actionUrl && (
+                            <>
+                              {' '}
+                              <a
+                                href={friendlyError.actionUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:text-rose-800"
+                              >
+                                {friendlyError.actionLabel}
+                              </a>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })()}
+
+                    {/* Busy Spinner */}
+                    {state.syncBusy && (
+                      <div className="flex items-center gap-2 mt-[6px]">
+                        <Loader size={14} className="animate-spin text-netskopeBlue" />
+                        <span className="text-xs text-fg-2">Processing...</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              )}
             </>
           )}
 
@@ -259,18 +313,18 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
             <>
               {/* Intro Line */}
               <div className="text-[0.8125rem] text-fg-3 leading-normal">
-                Deleting a project backs up its tasks first — to its linked spreadsheet if connected
+                Deleting a project backs up its tasks first — to Drive if connected
                 and configured, otherwise as a CSV download.
               </div>
 
               {/* Projects List */}
               <div className="flex flex-col gap-3">
                 {state.projects.map((project) => {
-                  const syncLabel = !project.spreadsheetId
-                    ? 'No spreadsheet configured'
+                  const syncLabel = !project.driveFileId
+                    ? 'Not connected to Drive'
                     : !project.lastSyncedAt
-                    ? 'Synced to spreadsheet'
-                    : `Synced to spreadsheet — last synced ${new Date(
+                    ? 'Synced to Drive'
+                    : `Synced to Drive — last synced ${new Date(
                         project.lastSyncedAt
                       ).toLocaleString('en-US', {
                         month: 'short',

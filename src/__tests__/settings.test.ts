@@ -7,11 +7,19 @@ import type { AppState } from '../lib/state'
 const mockState: AppState = {
   activeView: 'dashboard',
   activeProjectId: 'p-1',
-  projects: [],
+  projects: [
+    {
+      id: 'p-1',
+      name: 'Test Project',
+      color: 'netskopeBlue',
+      driveFileId: undefined,
+      lastSyncedSnapshot: null,
+      lastSyncedAt: null,
+      googleAccessToken: undefined,
+      googleUserEmail: undefined,
+    },
+  ],
   savedProjects: {},
-  googleAccessToken: undefined,
-  googleUserEmail: undefined,
-  googleStatus: undefined,
   googleBusy: false,
   settingsOpen: false,
   settingsTab: 'general',

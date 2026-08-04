@@ -48,7 +48,7 @@ describe('parseSyncError', () => {
 
     const result = parseSyncError(raw)
 
-    expect(result.message).toContain('Spreadsheet not found')
+    expect(result.message).toContain('Drive file not found')
     expect(result.actionUrl).toBeUndefined()
   })
 
@@ -59,7 +59,7 @@ describe('parseSyncError', () => {
 
     const result = parseSyncError(raw)
 
-    expect(result.message).toContain('Spreadsheet not found')
+    expect(result.message).toContain('Drive file not found')
     expect(result.message).toContain('someone@example.com')
   })
 

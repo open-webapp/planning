@@ -23,9 +23,8 @@ import {
   SyncConflictOverlay,
   SyncToast,
 } from './overlays'
-import { requestAccessToken, revokeToken, pushToSheet, pullFromSheet } from './lib/googleAuth'
-import { syncNow } from './lib/sync'
-import { exportTasksCsv } from './lib/csv'
+import { requestAccessToken, revokeToken, connectDriveSync } from './lib/googleAuth'
+import { syncNow, resolveSyncConflicts } from './lib/sync'
 
 /**
  * Initialize app state from localStorage or seed data
@@ -38,9 +37,6 @@ function initializeState(): AppState {
       activeProjectId: persisted.activeProjectId || '',
       projects: persisted.projects || [],
       savedProjects: persisted.savedProjects || {},
-      googleAccessToken: persisted.googleAccessToken,
-      googleUserEmail: persisted.googleUserEmail,
-      googleStatus: persisted.googleStatus,
       googleBusy: false,
       syncBusy: false,
       syncConflicts: [],
@@ -74,15 +70,14 @@ function initializeState(): AppState {
         id: projectId,
         name: 'Main Project',
         color: 'netskopeBlue',
-        spreadsheetId: null,
+        driveFileId: undefined,
         lastSyncedSnapshot: null,
         lastSyncedAt: null,
+        googleAccessToken: undefined,
+        googleUserEmail: undefined,
       },
     ],
     savedProjects: {},
-    googleAccessToken: undefined,
-    googleUserEmail: undefined,
-    googleStatus: undefined,
     googleBusy: false,
     syncBusy: false,
     syncConflicts: [],
@@ -127,8 +122,10 @@ function useAppDispatch(baseState: AppState, baseDispatch: React.Dispatch<Dispat
 
     // Handle async actions before dispatching to reducer
     if (action.type === 'REQUEST_GOOGLE_TOKEN') {
+      const projectId = stateRef.current.activeProjectId
       requestAccessToken(
-        ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/userinfo.email'],
+        projectId,
+        ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/userinfo.email'],
         async (token: string) => {
           try {
             // Fetch user info to get email
@@ -147,6 +144,44 @@ function useAppDispatch(baseState: AppState, baseDispatch: React.Dispatch<Dispat
                 token,
                 email: userInfo.email,
               })
+
+              // Merge the two-step flow: provision this project's Drive file
+              // as part of the same click that connects the Google account.
+              const currentState = stateRef.current
+              const activeProject = currentState.projects.find(
+                (p) => p.id === currentState.activeProjectId
+              )
+              if (activeProject && !activeProject.driveFileId) {
+                try {
+                  // Guard: ensure we have data to upload to Drive
+                  const tasksToUpload = currentState.tasks || []
+                  const milestonesToUpload = currentState.milestones || []
+
+                  if (tasksToUpload.length === 0 && milestonesToUpload.length === 0) {
+                    console.warn('No tasks or milestones to upload to Drive')
+                  }
+
+                  const driveFileId = await connectDriveSync(
+                    token,
+                    tasksToUpload,
+                    milestonesToUpload,
+                    activeProject.name,
+                    activeProject.id
+                  )
+                  // Store the initial snapshot to prevent conflicts on first sync
+                  const snapshot = JSON.stringify({
+                    tasks: tasksToUpload,
+                    milestones: milestonesToUpload,
+                  })
+                  baseDispatch({
+                    type: 'UPDATE_PROJECT',
+                    projectId: activeProject.id,
+                    patch: { driveFileId, lastSyncedSnapshot: snapshot, lastSyncedAt: new Date().toISOString() },
+                  })
+                } catch (error) {
+                  console.error('Drive sync connection failed:', error)
+                }
+              }
             } else {
               baseDispatch({
                 type: 'GOOGLE_TOKEN_ERROR',
@@ -169,9 +204,10 @@ function useAppDispatch(baseState: AppState, baseDispatch: React.Dispatch<Dispat
         })
       })
     } else if (action.type === 'REVOKE_GOOGLE_TOKEN') {
-      const token = stateRef.current.googleAccessToken
+      const projectId = stateRef.current.activeProjectId
+      const token = stateRef.current.projects.find(p => p.id === projectId)?.googleAccessToken
       if (token) {
-        revokeToken()
+        revokeToken(projectId)
           .then(() => {
             baseDispatch(action)
           })
@@ -182,86 +218,10 @@ function useAppDispatch(baseState: AppState, baseDispatch: React.Dispatch<Dispat
       } else {
         baseDispatch(action)
       }
-    } else if (action.type === 'SYNC_STARTED' && action.operation === 'backup') {
-      const state = stateRef.current
-      const activeProject = state.projects.find((p) => p.id === state.activeProjectId)
-
-      if (!state.googleAccessToken || !activeProject?.spreadsheetId) {
-        baseDispatch({
-          type: 'SYNC_ERROR',
-          error: 'Not connected or no spreadsheet ID',
-        })
-        return
-      }
-
-      // Dispatch to reducer to set syncBusy
+    } else if (action.type === 'SYNC_RESOLVE_CONFLICTS') {
+      const stateAtResolve = stateRef.current
       baseDispatch(action)
-
-      pushToSheet(activeProject.spreadsheetId, state.googleAccessToken, state.tasks, state.milestones)
-        .then((result) => {
-          if (result.success) {
-            baseDispatch({
-              type: 'SYNC_SUCCESS',
-              message: result.message,
-              projectId: state.activeProjectId,
-              tasks: state.tasks,
-              milestones: state.milestones,
-              timestamp: new Date().toISOString(),
-            })
-          } else {
-            baseDispatch({
-              type: 'SYNC_ERROR',
-              error: result.message,
-            })
-          }
-        })
-        .catch((error) => {
-          console.error('Backup failed:', error)
-          baseDispatch({
-            type: 'SYNC_ERROR',
-            error: error.message || 'Backup failed',
-          })
-        })
-    } else if (action.type === 'SYNC_STARTED' && action.operation === 'restore') {
-      const state = stateRef.current
-      const activeProject = state.projects.find((p) => p.id === state.activeProjectId)
-
-      if (!state.googleAccessToken || !activeProject?.spreadsheetId) {
-        baseDispatch({
-          type: 'SYNC_ERROR',
-          error: 'Not connected or no spreadsheet ID',
-        })
-        return
-      }
-
-      // Dispatch to reducer to set syncBusy
-      baseDispatch(action)
-
-      pullFromSheet(activeProject.spreadsheetId, state.googleAccessToken, state.milestones)
-        .then((result) => {
-          if (result === null) {
-            baseDispatch({
-              type: 'SYNC_ERROR',
-              error: 'Sheet or tabs not found. Have you synced yet?',
-            })
-          } else {
-            baseDispatch({
-              type: 'SYNC_SUCCESS',
-              tasks: result.tasks,
-              milestones: result.milestones,
-              projectId: state.activeProjectId,
-              message: 'Restore complete',
-              timestamp: new Date().toISOString(),
-            })
-          }
-        })
-        .catch((error) => {
-          console.error('Restore failed:', error)
-          baseDispatch({
-            type: 'SYNC_ERROR',
-            error: error.message || 'Restore failed',
-          })
-        })
+      resolveSyncConflicts(stateAtResolve, baseDispatch, action.choices)
     } else {
       baseDispatch(action)
     }
@@ -304,11 +264,6 @@ function App() {
 
   const handleSyncClick = () => {
     syncNow(state, dispatch)
-  }
-
-  const handleExportCsv = () => {
-    const activeProject = state.projects.find((p) => p.id === state.activeProjectId)
-    exportTasksCsv(state.tasks, state.milestones, activeProject?.name || 'project')
   }
 
   const handleDeleteProject = (projectId: string) => {
@@ -358,7 +313,6 @@ function App() {
       onViewChange={handleViewChange}
       onSettingsClick={handleSettingsClick}
       onSyncClick={handleSyncClick}
-      onExportCsv={handleExportCsv}
       toolbar={<Toolbar state={state} dispatch={dispatch} onAddTask={handleAddTask} />}
     >
       {renderView()}

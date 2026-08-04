@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { LayoutGrid, ListChecks, BarChart3, ChevronDown, Settings, CloudSync, Loader2, Download } from 'lucide-react'
+import { LayoutGrid, ListChecks, BarChart3, ChevronDown, Settings, CloudSync, Loader2 } from 'lucide-react'
 import type { AppState } from '../lib/state'
 import ProjectSwitcher from './ProjectSwitcher'
 
@@ -9,7 +9,6 @@ export interface AppShellProps {
   onViewChange: (view: 'dashboard' | 'tasks' | 'milestones' | 'timeline') => void
   onSettingsClick?: () => void
   onSyncClick?: () => void
-  onExportCsv?: () => void
   onCloseProjectMenu?: () => void
   toolbar?: React.ReactNode
   children?: React.ReactNode
@@ -21,7 +20,6 @@ const AppShell: React.FC<AppShellProps> = ({
   onViewChange,
   onSettingsClick,
   onSyncClick,
-  onExportCsv,
   onCloseProjectMenu,
   toolbar,
   children,
@@ -107,7 +105,7 @@ const AppShell: React.FC<AppShellProps> = ({
         <div className="flex-1" />
 
         {/* CloudSync icon */}
-        {activeProject?.spreadsheetId && (
+        {activeProject?.googleAccessToken && activeProject?.driveFileId && (
           <button
             onClick={onSyncClick}
             title="Sync with sheet"
@@ -121,16 +119,6 @@ const AppShell: React.FC<AppShellProps> = ({
             )}
           </button>
         )}
-
-        {/* CSV Export icon */}
-        <button
-          onClick={onExportCsv}
-          title="Download tasks as CSV"
-          aria-label="Download tasks as CSV"
-          className="flex items-center justify-center w-[34px] h-[34px] rounded-md text-white/75 hover:bg-white/12 hover:text-monoWhite transition-colors flex-shrink-0"
-        >
-          <Download size={18} />
-        </button>
 
         {/* Settings icon */}
         <button

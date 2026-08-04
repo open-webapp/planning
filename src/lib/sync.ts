@@ -1,6 +1,7 @@
 import type { Task, Milestone, SyncConflict } from './types'
 import type { AppState } from './state'
-import { getAccessToken, pullFromSheet, pushToSheet } from './googleAuth'
+import { getAccessToken, getDriveCsvContent, updateDriveCsvFile } from './googleAuth'
+import { parseTasksCsvString, buildTasksCsvString } from './csv'
 
 /**
  * Represents changes (diffs) against a snapshot, per entity (task or milestone).
@@ -208,13 +209,17 @@ export function threeWayMerge(
     const sheetModified = sheetChanges.tasks.modifiedIds.has(taskId)
 
     // Handle deletion conflicts
+    // When one side deletes a task while the other edits it, we don't silently
+    // drop the edit: emit a conflict with the pseudo-field '__deleted' so the user
+    // can decide. Resolution always keeps the data - the task is never actually
+    // deleted here, it's kept (from whichever side has it) pending user choice.
     if (browserRemoved && sheetModified && sheetTask) {
       conflicts.push({
         taskId,
         taskName: sheetTask.name,
-        field: '__deleted' as any,
+        field: '__deleted',
         browserValue: 'deleted',
-        sheetValue: 'edited',
+        driveValue: 'edited',
       })
       mergedTasks.push(sheetTask)
       return
@@ -224,9 +229,9 @@ export function threeWayMerge(
       conflicts.push({
         taskId,
         taskName: browserTask.name,
-        field: '__deleted' as any,
+        field: '__deleted',
         browserValue: 'edited',
-        sheetValue: 'deleted',
+        driveValue: 'deleted',
       })
       mergedTasks.push(browserTask)
       return
@@ -284,7 +289,7 @@ export function threeWayMerge(
               taskName: baseTask.name,
               field: field as keyof Task,
               browserValue: browserChange.newValue,
-              sheetValue: sheetChange.newValue,
+              driveValue: sheetChange.newValue,
             })
             // Keep browser value as placeholder
             ;(baseTask as any)[field] = browserChange.newValue
@@ -327,13 +332,16 @@ export function threeWayMerge(
     const sheetModified = sheetChanges.milestones.modifiedIds.has(milestoneId)
 
     // Handle deletion conflicts
+    // Same semantics as the task case above: a delete-vs-edit conflict on a milestone
+    // is surfaced via the '__deleted' pseudo-field rather than resolved automatically.
+    // The milestone is never actually deleted here - it's retained pending the user's choice.
     if (browserRemoved && sheetModified && sheetMilestone) {
       conflicts.push({
         taskId: milestoneId,
         taskName: sheetMilestone.name,
-        field: '__deleted' as any,
+        field: '__deleted',
         browserValue: 'deleted',
-        sheetValue: 'edited',
+        driveValue: 'edited',
       })
       mergedMilestones.push(sheetMilestone)
       return
@@ -343,9 +351,9 @@ export function threeWayMerge(
       conflicts.push({
         taskId: milestoneId,
         taskName: browserMilestone.name,
-        field: '__deleted' as any,
+        field: '__deleted',
         browserValue: 'edited',
-        sheetValue: 'deleted',
+        driveValue: 'deleted',
       })
       mergedMilestones.push(browserMilestone)
       return
@@ -402,7 +410,7 @@ export function threeWayMerge(
               taskName: mergedMilestone.name,
               field: field as any,
               browserValue: browserChange.newValue,
-              sheetValue: sheetChange.newValue,
+              driveValue: sheetChange.newValue,
             })
             // Keep browser value as placeholder
             ;(mergedMilestone as any)[field] = browserChange.newValue
@@ -431,13 +439,13 @@ export function threeWayMerge(
 
 /**
  * Apply user's conflict resolutions to the merged state.
- * choices: { [conflictKey]: 'sheet' | 'browser' } keyed by "${taskId}:${field}"
+ * choices: { [conflictKey]: 'drive' | 'browser' } keyed by "${taskId}:${field}"
  * Returns final state ready to commit locally and push.
  */
 export function applyResolutions(
   merged: { tasks: Task[]; milestones: Milestone[] },
   conflicts: SyncConflict[],
-  choices: { [conflictKey: string]: 'sheet' | 'browser' }
+  choices: { [conflictKey: string]: 'drive' | 'browser' }
 ): { tasks: Task[]; milestones: Milestone[] } {
   // Create a map of task/milestone id -> { field -> chosen value }
   const resolutionMap = new Map<string, Map<string, unknown>>()
@@ -452,7 +460,7 @@ export function applyResolutions(
     }
 
     const entityResolutions = resolutionMap.get(entityId)!
-    const chosenValue = choice === 'sheet' ? conflict.sheetValue : conflict.browserValue
+    const chosenValue = choice === 'drive' ? conflict.driveValue : conflict.browserValue
     entityResolutions.set(field, chosenValue)
   })
 
@@ -464,7 +472,9 @@ export function applyResolutions(
     const resolved = { ...task }
     taskResolutions.forEach((value, field) => {
       if (field === '__deleted') {
-        // Skip pseudo-field for tasks; deletion is handled separately
+        // '__deleted' is a marker for the deletion-vs-edit conflict, not a real field
+        // to assign. There's nothing to apply here: mergeTask already kept the entity
+        // in the merged result, so resolving this conflict never removes it.
         return
       }
       ;(resolved as any)[field] = value
@@ -480,7 +490,8 @@ export function applyResolutions(
     const resolved = { ...milestone }
     milestoneResolutions.forEach((value, field) => {
       if (field === '__deleted') {
-        // Skip pseudo-field for milestones
+        // Same as tasks above: nothing to apply, the entity was already kept
+        // by mergeMilestone during the merge step.
         return
       }
       ;(resolved as any)[field] = value
@@ -520,17 +531,20 @@ export async function syncNow(
   dispatch({ type: 'SYNC_STARTED' })
 
   try {
-    // Ensure we have a project with a spreadsheet ID
-    if (!activeProject?.spreadsheetId) {
-      throw new Error('No spreadsheet ID configured for this project')
+    // Ensure we have a project with a Drive file ID
+    if (!activeProject?.driveFileId) {
+      throw new Error('No Drive file ID configured for this project')
     }
 
-    // Get access token
-    const token = await getAccessToken()
+    // Get access token for this project
+    const token = await getAccessToken(projectId)
 
-    // Pull sheet data
-    let sheetData = await pullFromSheet(activeProject.spreadsheetId, token, state.milestones)
-    if (sheetData === null) {
+    // Pull CSV data from Drive
+    const csvText = await getDriveCsvContent(activeProject.driveFileId, token, projectId)
+    let sheetData: { tasks: Task[]; milestones: Milestone[] }
+    if (csvText !== null) {
+      sheetData = parseTasksCsvString(csvText, state.milestones)
+    } else {
       sheetData = { tasks: [], milestones: [] }
     }
 
@@ -545,16 +559,16 @@ export async function syncNow(
       }
     }
 
-    // Guard against data loss: if we've synced before (snapshot has data) but the sheet
+    // Guard against data loss: if we've synced before (snapshot has data) but the Drive file
     // just came back completely empty, that's almost certainly a transient fetch/parse
-    // problem (or a blanked-out sheet) rather than the user deleting everything. Treating
-    // it as real would make threeWayMerge see every task/milestone as "deleted on the sheet
+    // problem (or a blanked-out Drive file) rather than the user deleting everything. Treating
+    // it as real would make threeWayMerge see every task/milestone as "deleted on the Drive file
     // side" and wipe them from the browser too. Fall back to first-sync semantics instead:
-    // trust the browser's data and let the push repopulate the sheet.
+    // trust the browser's data and let the push repopulate the Drive file.
     const hadSnapshotData = !!snapshot && (snapshot.tasks.length > 0 || snapshot.milestones.length > 0)
     const sheetCameBackEmpty = sheetData.tasks.length === 0 && sheetData.milestones.length === 0
     if (hadSnapshotData && sheetCameBackEmpty) {
-      console.warn('Sheet pull returned no data despite an existing snapshot; treating as a stale read instead of a mass deletion')
+      console.warn('Drive file pull returned no data despite an existing snapshot; treating as a stale read instead of a mass deletion')
       snapshot = null
     }
 
@@ -581,8 +595,15 @@ export async function syncNow(
 
     // Handle conflicts or success
     if (conflicts.length === 0) {
-      // No conflicts: push merged data to sheet
-      const pushResult = await pushToSheet(activeProject.spreadsheetId, token, merged.tasks, merged.milestones)
+      // No conflicts: push merged data to Drive CSV
+      let pushResult: { success: boolean; message: string }
+      try {
+        await updateDriveCsvFile(activeProject.driveFileId, buildTasksCsvString(merged.tasks, merged.milestones), token, projectId)
+        pushResult = { success: true, message: 'Sync completed successfully' }
+      } catch (pushError) {
+        const errorMsg = pushError instanceof Error ? pushError.message : String(pushError)
+        pushResult = { success: false, message: errorMsg }
+      }
 
       if (!pushResult.success) {
         dispatch({ type: 'SYNC_ERROR', error: pushResult.message })
@@ -621,6 +642,65 @@ export async function syncNow(
       return
     }
 
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    dispatch({
+      type: 'SYNC_ERROR',
+      error: errorMessage,
+    })
+  }
+}
+
+/**
+ * Applies the user's conflict resolution choices to the pending merged result
+ * (captured on state.syncPendingMerge by SYNC_CONFLICTS_DETECTED) and pushes
+ * the resolved data to Drive, mirroring the no-conflict push path in syncNow.
+ */
+export async function resolveSyncConflicts(
+  state: AppState,
+  dispatch: (action: any) => void,
+  choices: { [conflictKey: string]: 'drive' | 'browser' }
+): Promise<void> {
+  const projectId = state.activeProjectId
+  const activeProject = state.projects.find((p) => p.id === projectId)
+
+  try {
+    if (!state.syncPendingMerge) {
+      throw new Error('No pending merge to resolve')
+    }
+    if (!activeProject?.driveFileId) {
+      throw new Error('No Drive file ID configured for this project')
+    }
+
+    const resolved = applyResolutions(state.syncPendingMerge, state.syncConflicts, choices)
+
+    const token = await getAccessToken(projectId)
+    await updateDriveCsvFile(
+      activeProject.driveFileId,
+      buildTasksCsvString(resolved.tasks, resolved.milestones),
+      token,
+      projectId
+    )
+
+    if (state.activeProjectId !== projectId) {
+      console.warn('Project switched mid-resolve, discarding sync result')
+      dispatch({ type: 'SYNC_ERROR', error: 'Sync cancelled: project switched' })
+      return
+    }
+
+    const timestamp = new Date().toISOString()
+    dispatch({
+      type: 'SYNC_SUCCESS',
+      tasks: resolved.tasks,
+      milestones: resolved.milestones,
+      snapshot: JSON.stringify(resolved),
+      timestamp,
+      projectId,
+    })
+  } catch (error) {
+    if (state.activeProjectId !== projectId) {
+      console.warn('Project switched during resolve error, discarding error dispatch')
+      return
+    }
     const errorMessage = error instanceof Error ? error.message : String(error)
     dispatch({
       type: 'SYNC_ERROR',
