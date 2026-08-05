@@ -18,9 +18,9 @@ export interface StatCards {
   overdueCount: number
 }
 
-export interface StatusBreakdown {
-  status: string
-  count: number
+export interface AssigneeBreakdown {
+  assignee: string // 'Unassigned' for empty/falsy task.assignee
+  totalEstimate: number
 }
 
 export interface UpcomingMilestone {
@@ -33,15 +33,6 @@ export interface UpcomingMilestone {
   statusCounts: { [status: string]: number }
 }
 
-export interface ActivityFeedItem {
-  id: string
-  taskId: string
-  taskName: string
-  author: string
-  ts: string
-  text: string
-}
-
 export interface DerivedData {
   // Row numbering (for Tasks view)
   rowMap: ComputeRowMapResult
@@ -49,21 +40,12 @@ export interface DerivedData {
   // Gantt metadata
   ganttMeta: GanttMetadata
 
-  // Dashboard stats
-  statCards: StatCards
-
-  // Status breakdown
-  statusBreakdown: StatusBreakdown[]
-
   // Milestone aggregates
   upcomingMilestones: UpcomingMilestone[]
-
-  // Activity feed
-  recentActivity: ActivityFeedItem[]
 }
 
 /**
- * Computes all derived state needed for Dashboard/Tasks/Gantt views
+ * Computes all derived state needed for Tasks/Gantt views
  */
 export function computeDerivedData(
   tasks: Task[],
@@ -89,13 +71,7 @@ export function computeDerivedData(
   // 2. Gantt metadata
   const ganttMeta = computeGanttMetadata(tasks, displaySchedules)
 
-  // 3. Dashboard stats
-  const statCards = computeStatCards(tasks, displaySchedules)
-
-  // 4. Status breakdown
-  const statusBreakdown = computeStatusBreakdown(tasks)
-
-  // 5. Upcoming milestones
+  // 3. Upcoming milestones
   const upcomingMilestones = computeUpcomingMilestones(
     tasks,
     milestones,
@@ -103,16 +79,10 @@ export function computeDerivedData(
     progressMap
   )
 
-  // 6. Recent activity
-  const recentActivity = computeRecentActivity(tasks)
-
   return {
     rowMap,
     ganttMeta,
-    statCards,
-    statusBreakdown,
     upcomingMilestones,
-    recentActivity,
   }
 }
 
@@ -190,7 +160,7 @@ function getWeekNumber(date: Date): number {
 /**
  * Compute dashboard stat cards
  */
-function computeStatCards(
+export function computeStatCards(
   tasks: Task[],
   displaySchedules: { [taskId: string]: { start: string; end: string } }
 ): StatCards {
@@ -226,27 +196,26 @@ function computeStatCards(
 }
 
 /**
- * Compute status breakdown: count tasks per status, sorted by count descending
+ * Sum task.estimate grouped by task.assignee, sorted descending by total.
+ * Tasks with an empty/falsy assignee are grouped into 'Unassigned' (not dropped).
  */
-function computeStatusBreakdown(tasks: Task[]): StatusBreakdown[] {
-  const statusMap: { [status: string]: number } = {}
+export function computeAssigneeBreakdown(tasks: Task[]): AssigneeBreakdown[] {
+  const totals: { [assignee: string]: number } = {}
 
   tasks.forEach((t) => {
-    if (!statusMap[t.status]) {
-      statusMap[t.status] = 0
-    }
-    statusMap[t.status]++
+    const key = t.assignee && t.assignee.trim() ? t.assignee : 'Unassigned'
+    totals[key] = (totals[key] || 0) + (t.estimate || 0)
   })
 
-  return Object.entries(statusMap)
-    .map(([status, count]) => ({ status, count }))
-    .sort((a, b) => b.count - a.count)
+  return Object.entries(totals)
+    .map(([assignee, totalEstimate]) => ({ assignee, totalEstimate }))
+    .sort((a, b) => b.totalEstimate - a.totalEstimate)
 }
 
 /**
  * Compute upcoming milestones (progress < 100) sorted by end date
  */
-function computeUpcomingMilestones(
+export function computeUpcomingMilestones(
   tasks: Task[],
   milestones: Milestone[],
   displaySchedules: { [taskId: string]: { start: string; end: string } },
@@ -305,34 +274,3 @@ function computeUpcomingMilestones(
     .sort((a, b) => (a.endDate < b.endDate ? -1 : 1))
 }
 
-/**
- * Compute recent activity feed from task comments (newest first, top 8)
- */
-function computeRecentActivity(tasks: Task[]): ActivityFeedItem[] {
-  const allComments: Array<
-    ActivityFeedItem & { ts: string }
-  > = []
-
-  tasks.forEach((t) => {
-    (t.comments || []).forEach((c) => {
-      allComments.push({
-        id: c.id,
-        taskId: t.id,
-        taskName: t.name,
-        author: c.author,
-        ts: c.ts,
-        text: c.text,
-      })
-    })
-  })
-
-  // Sort by timestamp descending (newest first)
-  allComments.sort((a, b) => {
-    const aTime = a.ts && !isNaN(new Date(a.ts).getTime()) ? new Date(a.ts).getTime() : 0
-    const bTime = b.ts && !isNaN(new Date(b.ts).getTime()) ? new Date(b.ts).getTime() : 0
-    return bTime - aTime
-  })
-
-  // Return top 8, filtering out entries with invalid timestamps
-  return allComments.filter((c) => c.ts && !isNaN(new Date(c.ts).getTime())).slice(0, 8)
-}

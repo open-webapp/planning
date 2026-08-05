@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { computeRowMap } from './rows'
+import { computeRowMap, taskMatchesFilters, filterTasksByFilters } from './rows'
 import type { Task } from './types'
+import type { TaskFilters } from './rows'
 
 function makeTask(overrides: Partial<Task>): Task {
   return {
@@ -20,6 +21,237 @@ function makeTask(overrides: Partial<Task>): Task {
   }
 }
 
+describe('taskMatchesFilters', () => {
+  describe('empty filters', () => {
+    it('matches all tasks when filters are empty', () => {
+      const task = makeTask({ id: 't1', status: 'In Progress', category: 'Backend' })
+      expect(taskMatchesFilters(task, {})).toBe(true)
+    })
+
+    it('matches all tasks when filters object is empty', () => {
+      const task = makeTask({ id: 't1' })
+      const filters: TaskFilters = {}
+      expect(taskMatchesFilters(task, filters)).toBe(true)
+    })
+  })
+
+  describe('status filter', () => {
+    it('filters by exact status match', () => {
+      const task = makeTask({ id: 't1', status: 'In Progress' })
+      expect(taskMatchesFilters(task, { status: 'In Progress' })).toBe(true)
+      expect(taskMatchesFilters(task, { status: 'Not Started' })).toBe(false)
+    })
+
+    it('treats "All" as no-op for status', () => {
+      const task = makeTask({ id: 't1', status: 'Not Started' })
+      expect(taskMatchesFilters(task, { status: 'All' })).toBe(true)
+    })
+  })
+
+  describe('category filter', () => {
+    it('filters by exact category match', () => {
+      const task = makeTask({ id: 't1', category: 'Backend' })
+      expect(taskMatchesFilters(task, { category: 'Backend' })).toBe(true)
+      expect(taskMatchesFilters(task, { category: 'Frontend' })).toBe(false)
+    })
+
+    it('treats "All" as no-op for category', () => {
+      const task = makeTask({ id: 't1', category: 'Design' })
+      expect(taskMatchesFilters(task, { category: 'All' })).toBe(true)
+    })
+  })
+
+  describe('assignee filter', () => {
+    it('filters by exact assignee match', () => {
+      const task = makeTask({ id: 't1', assignee: 'Alice' })
+      expect(taskMatchesFilters(task, { assignee: 'Alice' })).toBe(true)
+      expect(taskMatchesFilters(task, { assignee: 'Bob' })).toBe(false)
+    })
+
+    it('treats "All" as no-op for assignee', () => {
+      const task = makeTask({ id: 't1', assignee: 'Charlie' })
+      expect(taskMatchesFilters(task, { assignee: 'All' })).toBe(true)
+    })
+  })
+
+  describe('milestone filter', () => {
+    it('filters by exact milestone match', () => {
+      const task = makeTask({ id: 't1', milestoneId: 'm1' })
+      expect(taskMatchesFilters(task, { milestone: 'm1' })).toBe(true)
+      expect(taskMatchesFilters(task, { milestone: 'm2' })).toBe(false)
+    })
+
+    it('treats "All" as no-op for milestone', () => {
+      const task = makeTask({ id: 't1', milestoneId: 'm1' })
+      expect(taskMatchesFilters(task, { milestone: 'All' })).toBe(true)
+    })
+  })
+
+  describe('search filter', () => {
+    it('filters by substring search (case-insensitive)', () => {
+      const task = makeTask({ id: 't1', name: 'Build Authentication System' })
+      expect(taskMatchesFilters(task, { search: 'Auth' })).toBe(true)
+      expect(taskMatchesFilters(task, { search: 'auth' })).toBe(true)
+      expect(taskMatchesFilters(task, { search: 'Build' })).toBe(true)
+      expect(taskMatchesFilters(task, { search: 'Nonexistent' })).toBe(false)
+    })
+
+    it('treats empty/whitespace search as no-op', () => {
+      const task = makeTask({ id: 't1', name: 'Some Task' })
+      expect(taskMatchesFilters(task, { search: '' })).toBe(true)
+      expect(taskMatchesFilters(task, { search: '   ' })).toBe(true)
+    })
+
+    it('performs case-insensitive search', () => {
+      const task = makeTask({ id: 't1', name: 'Create Dashboard' })
+      expect(taskMatchesFilters(task, { search: 'DASHBOARD' })).toBe(true)
+      expect(taskMatchesFilters(task, { search: 'dashboard' })).toBe(true)
+      expect(taskMatchesFilters(task, { search: 'Dashboard' })).toBe(true)
+    })
+  })
+
+  describe('combined filters', () => {
+    it('ANDs multiple filters together', () => {
+      const task = makeTask({
+        id: 't1',
+        status: 'In Progress',
+        category: 'Backend',
+        assignee: 'Alice',
+      })
+      // All match
+      expect(
+        taskMatchesFilters(task, {
+          status: 'In Progress',
+          category: 'Backend',
+          assignee: 'Alice',
+        })
+      ).toBe(true)
+      // One fails
+      expect(
+        taskMatchesFilters(task, {
+          status: 'In Progress',
+          category: 'Backend',
+          assignee: 'Bob',
+        })
+      ).toBe(false)
+      // Multiple fail
+      expect(
+        taskMatchesFilters(task, {
+          status: 'Not Started',
+          category: 'Frontend',
+          assignee: 'Bob',
+        })
+      ).toBe(false)
+    })
+
+    it('handles "All" values correctly in combined filters', () => {
+      const task = makeTask({
+        id: 't1',
+        status: 'In Progress',
+        category: 'Backend',
+      })
+      // "All" treated as no-op, other filter matches
+      expect(
+        taskMatchesFilters(task, {
+          status: 'All',
+          category: 'Backend',
+        })
+      ).toBe(true)
+      // "All" treated as no-op, other filter doesn't match
+      expect(
+        taskMatchesFilters(task, {
+          status: 'All',
+          category: 'Frontend',
+        })
+      ).toBe(false)
+    })
+
+    it('combines status, category, assignee, milestone, and search', () => {
+      const task = makeTask({
+        id: 't1',
+        name: 'Implement Authentication',
+        status: 'In Progress',
+        category: 'Backend',
+        assignee: 'Alice',
+        milestoneId: 'm1',
+      })
+      expect(
+        taskMatchesFilters(task, {
+          status: 'In Progress',
+          category: 'Backend',
+          assignee: 'Alice',
+          milestone: 'm1',
+          search: 'Auth',
+        })
+      ).toBe(true)
+      // Fails on search
+      expect(
+        taskMatchesFilters(task, {
+          status: 'In Progress',
+          category: 'Backend',
+          assignee: 'Alice',
+          milestone: 'm1',
+          search: 'Nonexistent',
+        })
+      ).toBe(false)
+    })
+  })
+})
+
+describe('filterTasksByFilters', () => {
+  it('returns empty array for empty task list', () => {
+    const result = filterTasksByFilters([], { status: 'In Progress' })
+    expect(result).toEqual([])
+  })
+
+  it('returns all tasks when filters are empty', () => {
+    const tasks = [
+      makeTask({ id: 't1' }),
+      makeTask({ id: 't2' }),
+      makeTask({ id: 't3' }),
+    ]
+    const result = filterTasksByFilters(tasks, {})
+    expect(result).toEqual(tasks)
+  })
+
+  it('filters tasks by status', () => {
+    const tasks = [
+      makeTask({ id: 't1', status: 'In Progress' }),
+      makeTask({ id: 't2', status: 'Not Started' }),
+      makeTask({ id: 't3', status: 'In Progress' }),
+    ]
+    const result = filterTasksByFilters(tasks, { status: 'In Progress' })
+    expect(result).toHaveLength(2)
+    expect(result.map((t) => t.id)).toEqual(['t1', 't3'])
+  })
+
+  it('filters tasks by multiple criteria', () => {
+    const tasks = [
+      makeTask({ id: 't1', status: 'In Progress', assignee: 'Alice' }),
+      makeTask({ id: 't2', status: 'In Progress', assignee: 'Bob' }),
+      makeTask({ id: 't3', status: 'Not Started', assignee: 'Alice' }),
+    ]
+    const result = filterTasksByFilters(tasks, {
+      status: 'In Progress',
+      assignee: 'Alice',
+    })
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('t1')
+  })
+
+  it('returns flat list (not hierarchical)', () => {
+    const tasks = [
+      makeTask({ id: 't1', parentId: null }),
+      makeTask({ id: 't2', parentId: 't1' }),
+      makeTask({ id: 't3', parentId: 't2' }),
+    ]
+    const result = filterTasksByFilters(tasks, {})
+    expect(result).toHaveLength(3)
+    // Flat list returned, no tree structure
+    expect(Array.isArray(result)).toBe(true)
+  })
+})
+
 describe('computeRowMap', () => {
   it('shows a task with no milestone in a project with zero milestones', () => {
     const tasks = [makeTask({ id: 't1', milestoneId: null })]
@@ -34,5 +266,17 @@ describe('computeRowMap', () => {
     const result = computeRowMap(tasks, [{ id: 'm1', name: 'M1' }], {}, 'startDate', 'asc', {}, {})
 
     expect(result.rowNumberMap['t1']).toBeDefined()
+  })
+
+  it('filters tasks using TaskFilters in computeRowMap', () => {
+    const tasks = [
+      makeTask({ id: 't1', status: 'In Progress', milestoneId: 'm1' }),
+      makeTask({ id: 't2', status: 'Not Started', milestoneId: 'm1' }),
+    ]
+    const milestones = [{ id: 'm1', name: 'M1' }]
+    const result = computeRowMap(tasks, milestones, {}, 'startDate', 'asc', {}, { status: 'In Progress' })
+
+    expect(result.rowNumberMap['t1']).toBeDefined()
+    expect(result.rowNumberMap['t2']).toBeUndefined()
   })
 })

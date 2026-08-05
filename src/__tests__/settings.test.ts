@@ -5,7 +5,7 @@ import type { AppState } from '../lib/state'
 
 // Mock AppState
 const mockState: AppState = {
-  activeView: 'dashboard',
+  activeView: 'tasks',
   activeProjectId: 'p-1',
   projects: [
     {

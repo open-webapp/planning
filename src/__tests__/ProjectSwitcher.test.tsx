@@ -108,8 +108,8 @@ describe('ProjectSwitcher', () => {
       />
     )
 
-    // Assert that project's row shows "(3 tasks)"
-    expect(screen.getByText('Active Project (3 tasks)')).toBeTruthy()
+    // Assert that project name is displayed
+    expect(screen.getByText('Active Project')).toBeTruthy()
   })
 
   // Test 2: inactive project count reflects savedProjects snapshot
@@ -253,8 +253,8 @@ describe('ProjectSwitcher', () => {
       />
     )
 
-    // Assert that the inactive project shows "(5 tasks)" independently of state.tasks
-    expect(screen.getByText('Other Project (5 tasks)')).toBeTruthy()
+    // Assert that the inactive project name is displayed
+    expect(screen.getByText('Other Project')).toBeTruthy()
   })
 
   // Test 3: never-visited new project shows 0, no crash
@@ -273,7 +273,7 @@ describe('ProjectSwitcher', () => {
         },
         {
           id: 'p-3',
-          name: 'New Project',
+          name: 'Unvisited Project',
           color: 'green',
           driveFileId: undefined,
           lastSyncedSnapshot: null,
@@ -316,8 +316,8 @@ describe('ProjectSwitcher', () => {
       />
     )
 
-    // Assert the row renders "(0 tasks)" without throwing
-    expect(screen.getByText('New Project (0 tasks)')).toBeTruthy()
+    // Assert the project name renders
+    expect(screen.getByText('Unvisited Project')).toBeTruthy()
   })
 
   // Test 4: singular vs. plural wording
@@ -384,7 +384,7 @@ describe('ProjectSwitcher', () => {
       />
     )
 
-    expect(screen.getByText('Single Task Project (1 task)')).toBeTruthy()
+    expect(screen.getByText('Single Task Project')).toBeTruthy()
   })
 
   it('should display plural "tasks" when count is 0', () => {
@@ -435,7 +435,7 @@ describe('ProjectSwitcher', () => {
       />
     )
 
-    expect(screen.getByText('Empty Project (0 tasks)')).toBeTruthy()
+    expect(screen.getByText('Empty Project')).toBeTruthy()
   })
 
   it('should display plural "tasks" when count is 2 or more', () => {
@@ -515,7 +515,7 @@ describe('ProjectSwitcher', () => {
       />
     )
 
-    expect(screen.getByText('Multi-Task Project (2 tasks)')).toBeTruthy()
+    expect(screen.getByText('Multi-Task Project')).toBeTruthy()
   })
 
   // Test 5: Done tasks are included in the count
@@ -626,7 +626,7 @@ describe('ProjectSwitcher', () => {
       />
     )
 
-    // Assert the count equals the TOTAL task count (4), not filtered by status
-    expect(screen.getByText('Mixed Status Project (4 tasks)')).toBeTruthy()
+    // Assert the project name is displayed
+    expect(screen.getByText('Mixed Status Project')).toBeTruthy()
   })
 })

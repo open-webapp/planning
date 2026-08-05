@@ -1,10 +1,41 @@
 import type { Task, Milestone } from './types'
 import { sortSiblings } from './sort'
 
+export interface TaskFilters {
+  status?: string
+  category?: string
+  assignee?: string
+  milestone?: string
+  search?: string
+}
+
 export interface ComputeRowMapResult {
   rowNumberMap: { [taskId: string]: number }
   numberToId: { [number: number]: string }
   visibleRows: Array<{ id: string; type: 'milestone' | 'task'; level: number }>
+}
+
+export function taskMatchesFilters(t: Task, filters: TaskFilters): boolean {
+  if (filters.status && filters.status !== 'All' && t.status !== filters.status) {
+    return false
+  }
+  if (filters.category && filters.category !== 'All' && t.category !== filters.category) {
+    return false
+  }
+  if (filters.assignee && filters.assignee !== 'All' && t.assignee !== filters.assignee) {
+    return false
+  }
+  if (filters.milestone && filters.milestone !== 'All' && t.milestoneId !== filters.milestone) {
+    return false
+  }
+  if (filters.search && filters.search.trim() && !t.name.toLowerCase().includes(filters.search.trim().toLowerCase())) {
+    return false
+  }
+  return true
+}
+
+export function filterTasksByFilters(tasks: Task[], filters: TaskFilters): Task[] {
+  return tasks.filter((t) => taskMatchesFilters(t, filters))
 }
 
 export function computeRowMap(
@@ -14,13 +45,7 @@ export function computeRowMap(
   sortKey: string,
   sortDir: 'asc' | 'desc',
   displaySchedules: { [taskId: string]: { start: string; end: string } },
-  filters: {
-    status?: string
-    category?: string
-    assignee?: string
-    milestone?: string
-    search?: string
-  }
+  filters: TaskFilters
 ): ComputeRowMapResult {
   // Check if any filter is active
   const anyFilter =
@@ -29,26 +54,6 @@ export function computeRowMap(
     (filters.assignee && filters.assignee !== 'All') ||
     (filters.milestone && filters.milestone !== 'All') ||
     (filters.search && filters.search.trim())
-
-  // Filter matching function - AND-combined filters
-  const matches = (t: Task): boolean => {
-    if (filters.status && filters.status !== 'All' && t.status !== filters.status) {
-      return false
-    }
-    if (filters.category && filters.category !== 'All' && t.category !== filters.category) {
-      return false
-    }
-    if (filters.assignee && filters.assignee !== 'All' && t.assignee !== filters.assignee) {
-      return false
-    }
-    if (filters.milestone && filters.milestone !== 'All' && t.milestoneId !== filters.milestone) {
-      return false
-    }
-    if (filters.search && filters.search.trim() && !t.name.toLowerCase().includes(filters.search.trim().toLowerCase())) {
-      return false
-    }
-    return true
-  }
 
   // Build row number map and visible rows
   const rowNumberMap: { [taskId: string]: number } = {}
@@ -63,7 +68,7 @@ export function computeRowMap(
     level: number,
     target: Array<{ id: string; type: 'milestone' | 'task'; level: number }>
   ) => {
-    if (matches(t)) {
+    if (taskMatchesFilters(t, filters)) {
       rowCounter++
       rowNumberMap[t.id] = rowCounter
       target.push({ id: t.id, type: 'task', level })

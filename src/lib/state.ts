@@ -5,7 +5,7 @@ import { exportTasksCsv } from './csv'
 
 export interface AppState {
   // Navigation & Project Management
-  activeView: 'dashboard' | 'tasks' | 'milestones' | 'timeline'
+  activeView: 'tasks' | 'milestones' | 'timeline'
   activeProjectId: string
   projects: Project[]
   savedProjects: { [projectId: string]: ProjectState } // per-project snapshots for inactive projects
@@ -145,6 +145,7 @@ export function snapshotForPersist(state: AppState): Partial<AppState> {
   snap.projects = state.projects
   snap.activeProjectId = state.activeProjectId
   snap.activeView = state.activeView
+  snap.savedProjects = state.savedProjects
   return snap
 }
 
@@ -178,14 +179,14 @@ export function savePersistedApp(state: AppState): void {
 /**
  * Switch to a different project.
  * Snapshots the current project into savedProjects, restores the target project,
- * and resets activeView to 'dashboard'.
+ * and resets activeView to 'tasks'.
  */
 export function switchProject(state: AppState, projectId: string): AppState {
   // If switching to the same project, just reset view
   if (projectId === state.activeProjectId) {
     return {
       ...state,
-      activeView: 'dashboard',
+      activeView: 'tasks',
     }
   }
 
@@ -207,7 +208,7 @@ export function switchProject(state: AppState, projectId: string): AppState {
     activeProjectId: projectId,
     savedProjects: updatedSavedProjects,
     ...restored,
-    activeView: 'dashboard',
+    activeView: 'tasks',
   }
 }
 
@@ -245,7 +246,7 @@ export function createProject(
     savedProjects,
     activeProjectId: projectId,
     ...emptyProjectState(),
-    activeView: 'dashboard',
+    activeView: 'tasks',
   }
 }
 
@@ -313,7 +314,7 @@ export function deleteProject(state: AppState, projectId: string): AppState {
       savedProjects: updatedSavedProjects,
       activeProjectId: nextProjectId,
       ...restored,
-      activeView: 'dashboard',
+      activeView: 'tasks',
     }
   }
 

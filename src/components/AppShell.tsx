@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { LayoutGrid, ListChecks, BarChart3, ChevronDown, Settings, CloudSync, Loader2 } from 'lucide-react'
+import { ListChecks, BarChart3, ChevronDown, Settings, CloudSync, Loader2 } from 'lucide-react'
 import type { AppState } from '../lib/state'
 import ProjectSwitcher from './ProjectSwitcher'
 
 export interface AppShellProps {
   state: AppState
   dispatch: (state: AppState) => void
-  onViewChange: (view: 'dashboard' | 'tasks' | 'milestones' | 'timeline') => void
+  onViewChange: (view: 'tasks' | 'milestones' | 'timeline') => void
   onSettingsClick?: () => void
   onSyncClick?: () => void
   onCloseProjectMenu?: () => void
@@ -48,7 +48,6 @@ const AppShell: React.FC<AppShellProps> = ({
   const activeProject = state.projects.find((p) => p.id === state.activeProjectId)
 
   const navTabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
     { id: 'tasks', label: 'Tasks', icon: ListChecks },
     { id: 'timeline', label: 'Timeline', icon: BarChart3 },
   ] as const

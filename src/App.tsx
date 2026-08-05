@@ -12,7 +12,6 @@ import { computeDerivedData } from './lib/selectors'
 import { computeBaseSchedules, computeDisplaySchedules, computeProgressMap, computeCriticalSet } from './lib/scheduling'
 import AppShell from './components/AppShell'
 import Toolbar from './components/Toolbar'
-import DashboardView from './views/DashboardView'
 import TasksView from './views/TasksView'
 import MilestonesView from './views/MilestonesView'
 import TimelineView from './views/TimelineView'
@@ -33,7 +32,7 @@ function initializeState(): AppState {
   const persisted = loadPersistedApp()
   if (persisted && persisted.projects && persisted.projects.length > 0) {
     return {
-      activeView: 'dashboard',
+      activeView: 'tasks',
       activeProjectId: persisted.activeProjectId || '',
       projects: persisted.projects || [],
       savedProjects: persisted.savedProjects || {},
@@ -63,7 +62,7 @@ function initializeState(): AppState {
   const projectId = 'p-default'
 
   return {
-    activeView: 'dashboard',
+    activeView: 'tasks',
     activeProjectId: projectId,
     projects: [
       {
@@ -254,7 +253,7 @@ function App() {
     progressMap
   )
 
-  const handleViewChange = (view: 'dashboard' | 'tasks' | 'milestones' | 'timeline') => {
+  const handleViewChange = (view: 'tasks' | 'milestones' | 'timeline') => {
     baseDispatch({ type: 'SET_ACTIVE_VIEW', view })
   }
 
@@ -276,8 +275,6 @@ function App() {
 
   const renderView = () => {
     switch (state.activeView) {
-      case 'dashboard':
-        return <DashboardView derivedData={derivedState} state={state} dispatch={dispatch} />
       case 'tasks':
         return (
           <TasksView

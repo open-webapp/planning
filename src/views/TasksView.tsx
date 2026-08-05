@@ -1,8 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import type { DerivedData } from '../lib/selectors'
 import type { AppState } from '../lib/state'
 import type { Task, Milestone } from '../lib/types'
+import { filterTasksByFilters } from '../lib/rows'
+import { computeStatCards, computeAssigneeBreakdown, computeUpcomingMilestones } from '../lib/selectors'
+import { statusColor } from '../lib/statusColors'
 import TaskRow from './TaskRow'
+import Collapsible from '../components/Collapsible'
 
 interface TasksViewProps {
   derivedData: DerivedData
@@ -18,6 +22,15 @@ interface MilestoneRowProps {
   width: number
   dispatch: (action: any) => void
 }
+
+// Stat card color/accent definitions for the 5 cards
+const STAT_ACCENTS = [
+  { label: 'Total Items', color: 'var(--ns-netskope-blue)' },
+  { label: 'Total Estimate', color: 'var(--ns-teal)' },
+  { label: 'Completed', color: 'var(--ns-success)' },
+  { label: 'In Progress', color: 'var(--ns-warning)' },
+  { label: 'Overdue', color: 'var(--ns-danger)' },
+]
 
 const MilestoneRow: React.FC<MilestoneRowProps> = ({ milestone, width, dispatch }) => {
   const [name, setName] = useState(milestone.name)
@@ -73,6 +86,31 @@ const TasksView: React.FC<TasksViewProps> = ({
   const { rowMap } = derivedData
   const [resizingColumn, setResizingColumn] = useState<string | null>(null)
   const [resizeStart, setResizeStart] = useState<number>(0)
+  const [showAllMilestones, setShowAllMilestones] = useState(false)
+
+  // Compute filtered tasks based on active filters
+  const filteredTasks = useMemo(
+    () => filterTasksByFilters(state.tasks, state.filters),
+    [state.tasks, state.filters]
+  )
+
+  // Compute stat cards for the filtered task set
+  const statCards = useMemo(
+    () => computeStatCards(filteredTasks, displaySchedules),
+    [filteredTasks, displaySchedules]
+  )
+
+  // Compute assignee breakdown for the filtered task set
+  const assigneeBreakdown = useMemo(
+    () => computeAssigneeBreakdown(filteredTasks),
+    [filteredTasks]
+  )
+
+  // Compute upcoming milestones for the filtered task set
+  const filteredUpcomingMilestones = useMemo(
+    () => computeUpcomingMilestones(filteredTasks, state.milestones, displaySchedules, progressMap),
+    [filteredTasks, state.milestones, displaySchedules, progressMap]
+  )
 
   const columns = [
     { name: 'number', label: '#', key: 'number' },
@@ -131,15 +169,141 @@ const TasksView: React.FC<TasksViewProps> = ({
     return state.milestones.find((m) => m.id === id)
   }
 
+  const renderAssigneeBreakdownChart = (): React.ReactNode => {
+    if (assigneeBreakdown.length === 0) {
+      return <p className="text-[0.8125rem] text-fg-3">No tasks match the current filters</p>
+    }
+
+    return (
+      <div className="space-y-2">
+        {assigneeBreakdown.map((entry) => {
+          const maxEstimate = assigneeBreakdown[0]?.totalEstimate || 0
+          const percentage = maxEstimate > 0 ? (entry.totalEstimate / maxEstimate) * 100 : 0
+          return (
+            <div key={entry.assignee} className="flex items-center gap-[10px]">
+              <span className="w-[100px] text-[0.8125rem] text-fg-2 flex-shrink-0 truncate">
+                {entry.assignee}
+              </span>
+              <div className="flex-1 h-2 bg-ink-100 rounded-pill overflow-hidden">
+                <div
+                  className="h-full rounded-pill"
+                  style={{ width: `${percentage}%`, background: 'var(--ns-netskope-blue)' }}
+                />
+              </div>
+              <span className="w-[28px] text-right text-[0.8125rem] text-fg-3">
+                {entry.totalEstimate}d
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  const renderUpcomingMilestonesChart = (): React.ReactNode => {
+    if (filteredUpcomingMilestones.length === 0) {
+      return <p className="text-[0.8125rem] text-fg-3">No upcoming milestones</p>
+    }
+
+    const visibleMilestones = showAllMilestones
+      ? filteredUpcomingMilestones
+      : filteredUpcomingMilestones.slice(0, 3)
+    const hiddenCount = filteredUpcomingMilestones.length - visibleMilestones.length
+
+    return (
+      <div>
+        {visibleMilestones.map((milestone) => (
+          <div
+            key={milestone.id}
+            onClick={() => {
+              dispatch({ type: 'SET_FILTER', filterKey: 'milestone', value: milestone.id })
+            }}
+            className="pb-2 border-b border-border last:border-b-0 cursor-pointer hover:bg-bg transition-colors p-2 rounded"
+          >
+            <div className="text-[0.8125rem] font-medium text-fg-1 mb-1">{milestone.name}</div>
+            <div className="text-[0.75rem] text-fg-3 mb-1">
+              {milestone.startDate && milestone.endDate
+                ? `${milestone.startDate} - ${milestone.endDate} · ${milestone.itemCount} items`
+                : 'No tasks assigned'}
+            </div>
+            {milestone.itemCount > 0 && (
+              <div className="w-full h-2 bg-ink-100 rounded-pill overflow-hidden">
+                <div
+                  className="h-full rounded-pill"
+                  style={{ width: `${milestone.progress}%`, background: statusColor('Done') }}
+                />
+              </div>
+            )}
+          </div>
+        ))}
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAllMilestones(true)}
+            className="text-[0.75rem] text-fg-3 hover:text-fg-1 mt-1 underline-offset-2 hover:underline"
+          >
+            +{hiddenCount} more
+          </button>
+        )}
+        {showAllMilestones && filteredUpcomingMilestones.length > 3 && (
+          <button
+            type="button"
+            onClick={() => setShowAllMilestones(false)}
+            className="text-[0.75rem] text-fg-3 hover:text-fg-1 mt-1 underline-offset-2 hover:underline"
+          >
+            Show fewer
+          </button>
+        )}
+      </div>
+    )
+  }
+
   const totalWidth = columns.reduce((sum, col) => sum + getColumnWidth(col.name), 0)
 
   return (
     <div
-      className="h-full overflow-auto bg-bg p-s7"
+      className="h-full overflow-auto bg-bg px-s7 py-2"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
+      {/* Stat Strip */}
+      <div className="flex items-center justify-center flex-wrap gap-s5 mb-2" style={{ minHeight: '44px' }}>
+        {STAT_ACCENTS.map((accent, idx) => {
+          const statKey = ['totalItems', 'totalEstimateDays', 'completedPercent', 'inProgressCount', 'overdueCount'][idx] as keyof typeof statCards
+          const value = statCards[statKey]
+          const displayValue =
+            idx === 1 ? `${value}d` :
+            idx === 2 ? `${value}%` :
+            String(value)
+
+          return (
+            <div key={accent.label} className="flex items-center gap-2">
+              <div
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: accent.color }}
+              />
+              <span className="text-[0.9375rem] font-semibold text-fg-1">{displayValue}</span>
+              <span className="text-[0.75rem] text-fg-3">{accent.label}</span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Breakdown Collapsible Section */}
+      <Collapsible label="Breakdown" defaultOpen={false}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-s3">
+          <div>
+            <div className="text-body font-medium mb-s4">Assignee breakdown</div>
+            <div className="flex flex-col gap-s3">{renderAssigneeBreakdownChart()}</div>
+          </div>
+          <div>
+            <div className="text-body font-medium mb-s4">Upcoming milestones</div>
+            <div className="flex flex-col gap-2">{renderUpcomingMilestonesChart()}</div>
+          </div>
+        </div>
+      </Collapsible>
+
       <div className="bg-white border border-border rounded-lg overflow-x-auto">
         <div style={{ minWidth: `${totalWidth}px` }}>
           {/* Header */}
