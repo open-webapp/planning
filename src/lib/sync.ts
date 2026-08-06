@@ -71,7 +71,8 @@ function diffEntity<T extends Task | Milestone>(
  */
 export function diffAgainstSnapshot(
   current: { tasks: Task[]; milestones: Milestone[] },
-  snapshot: { tasks: Task[]; milestones: Milestone[] } | null
+  snapshot: { tasks: Task[]; milestones: Milestone[] } | null,
+  taskSkipFields: string[] = []
 ): ChangeSet {
   const changeset: ChangeSet = {
     tasks: { addedIds: new Set(), removedIds: new Set(), modifiedIds: new Map() },
@@ -94,7 +95,7 @@ export function diffAgainstSnapshot(
     if (!snapshotTask) {
       changeset.tasks.addedIds.add(id)
     } else {
-      const fieldDiff = diffEntity(task, snapshotTask)
+      const fieldDiff = diffEntity(task, snapshotTask, ['comments', 'notes', ...taskSkipFields])
       if (fieldDiff.size > 0) {
         changeset.tasks.modifiedIds.set(id, fieldDiff)
       }
@@ -572,10 +573,12 @@ export async function syncNow(
       snapshot = null
     }
 
-    // Calculate diffs
+    // Calculate diffs. The CSV format has no Order/Parent columns, so parseTasksCsvString
+    // always hardcodes order:0 and parentId:null — those aren't real sheet-side edits, so
+    // skip them here to avoid clobbering the browser's manual ordering/nesting on every sync.
     const browserData = { tasks: state.tasks, milestones: state.milestones }
     const browserChanges = diffAgainstSnapshot(browserData, snapshot)
-    const sheetChanges = diffAgainstSnapshot(sheetData, snapshot)
+    const sheetChanges = diffAgainstSnapshot(sheetData, snapshot, ['order', 'parentId'])
 
     // Perform three-way merge
     const { merged, conflicts } = threeWayMerge(

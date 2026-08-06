@@ -53,6 +53,17 @@ export function appReducer(state: AppState, action: Action): AppState {
     case 'OUTDENT_TASK':
       return StateActions.outdentTask(state, action.taskId)
 
+    case 'MOVE_TASK_TO_POSITION':
+      return StateActions.moveTaskToPosition(
+        state,
+        action.taskId,
+        action.newMilestoneId,
+        action.newParentId,
+        action.beforeTaskId,
+        action.afterTaskId,
+        action.displaySchedules
+      )
+
     // Filters & Sorting
     case 'SET_FILTER':
       return StateActions.setFilter(state, action.filterKey, action.value)

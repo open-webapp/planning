@@ -32,6 +32,8 @@ export function sortSiblings(
         return displaySchedules[t.id] ? displaySchedules[t.id].end : t.startDate
       case 'progress':
         return t.progress || 0
+      case 'manual':
+        return t.order || 0
       default:
         return 0
     }

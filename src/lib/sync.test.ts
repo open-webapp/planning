@@ -27,6 +27,7 @@ function createTask(id: string, overrides?: Partial<Task>): Task {
     estimate: 5,
     startDate: '2026-08-01',
     progress: 0,
+    order: 0,
     dependencies: [],
     comments: [],
     ...overrides,
@@ -890,5 +891,33 @@ describe('sync engine', () => {
     const errorCall = dispatch.mock.calls.find(call => call[0].type === 'SYNC_ERROR')
     expect(errorCall).toBeDefined()
     expect(errorCall![0].error).toContain('Push failed')
+  })
+
+  /**
+   * Regression: the CSV format has no Order/Parent columns, so parseTasksCsvString
+   * hardcodes order:0 and parentId:null on every parsed row. Prior to the fix, treating
+   * that as a real "sheet changed this field" diff wiped manual drag order and subtask
+   * nesting on every sync, even with no real edit on either side.
+   */
+  it('does not let the lossy CSV round-trip clobber order/parentId', () => {
+    const browserTasks = [
+      createTask('t1', { order: 1000, parentId: null }),
+      createTask('t2', { order: 500, parentId: 't1' }),
+    ]
+    const snapshot = { tasks: browserTasks.map((t) => ({ ...t })), milestones: [] as Milestone[] }
+    // Sheet side as it comes back from parseTasksCsvString: order/parentId always reset.
+    const sheetTasks = browserTasks.map((t) => ({ ...t, order: 0, parentId: null }))
+
+    const browserData = { tasks: browserTasks, milestones: [] }
+    const sheetData = { tasks: sheetTasks, milestones: [] }
+
+    const browserChanges = diffAgainstSnapshot(browserData, snapshot)
+    const sheetChanges = diffAgainstSnapshot(sheetData, snapshot, ['order', 'parentId'])
+
+    const { merged } = threeWayMerge(browserChanges, sheetChanges, snapshot, browserData, sheetData)
+
+    const child = merged.tasks.find((t) => t.id === 't2')!
+    expect(child.order).toBe(500)
+    expect(child.parentId).toBe('t1')
   })
 })

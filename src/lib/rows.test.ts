@@ -15,6 +15,7 @@ function makeTask(overrides: Partial<Task>): Task {
     estimate: 3,
     startDate: '2026-08-01',
     progress: 0,
+    order: 0,
     dependencies: [],
     comments: [],
     ...overrides,
@@ -278,5 +279,25 @@ describe('computeRowMap', () => {
 
     expect(result.rowNumberMap['t1']).toBeDefined()
     expect(result.rowNumberMap['t2']).toBeUndefined()
+  })
+
+  it('renders rows in order-based sequence with manual sort', () => {
+    const tasks = [
+      makeTask({ id: 't3', order: 3000, name: 'Third', milestoneId: 'm1' }),
+      makeTask({ id: 't1', order: 1000, name: 'First', milestoneId: 'm1' }),
+      makeTask({ id: 't2', order: 2000, name: 'Second', milestoneId: 'm1' }),
+    ]
+    const milestones = [{ id: 'm1', name: 'M1' }]
+    const result = computeRowMap(tasks, milestones, {}, 'manual', 'asc', {}, {})
+
+    // Verify all tasks are visible
+    expect(result.rowNumberMap['t1']).toBeDefined()
+    expect(result.rowNumberMap['t2']).toBeDefined()
+    expect(result.rowNumberMap['t3']).toBeDefined()
+
+    // Verify they appear in order-based sequence
+    const visibleTaskRows = result.visibleRows.filter((r) => r.type === 'task')
+    const visibleIds = visibleTaskRows.map((r) => r.id)
+    expect(visibleIds).toEqual(['t1', 't2', 't3'])
   })
 })

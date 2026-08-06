@@ -2,6 +2,12 @@ import type { Task, Milestone, Project, Comment, SyncConflict } from './types'
 import { uid } from './seed'
 import { TODAY } from './dates'
 import { exportTasksCsv } from './csv'
+import {
+  computeOrderBetween,
+  getSiblingGroup,
+  isGroupBackfilled,
+  backfillGroupOrders,
+} from './order'
 
 export interface AppState {
   // Navigation & Project Management
@@ -330,6 +336,95 @@ export function deleteProject(state: AppState, projectId: string): AppState {
 // ============================================================================
 
 /**
+ * Ensure manual mode for a task's sibling group, backfilling orders if needed.
+ * Internal helper used by moveTaskToPosition and related functions.
+ */
+function ensureManualModeForGroup(
+  state: AppState,
+  taskId: string,
+  displaySchedules: { [taskId: string]: { start: string; end: string } }
+): AppState {
+  const task = state.tasks.find((t) => t.id === taskId)
+  if (!task) return state
+
+  const group = getSiblingGroup(state.tasks, state.milestones, task)
+  const needsBackfill = !isGroupBackfilled(group)
+
+  const tasks = needsBackfill
+    ? backfillGroupOrders(state.tasks, group, state.sortKey, state.sortDir, displaySchedules)
+    : state.tasks
+
+  return { ...state, tasks, sortKey: 'manual', sortDir: 'asc' }
+}
+
+/**
+ * Move a task to a new position (milestone/parent/order), switching to manual mode.
+ * Backfills both the source and target sibling groups to ensure coherent ordering.
+ * Propagates milestoneId through the task's entire subtree if milestone changed.
+ */
+export function moveTaskToPosition(
+  state: AppState,
+  taskId: string,
+  newMilestoneId: string | null,
+  newParentId: string | null,
+  beforeTaskId: string | undefined,
+  afterTaskId: string | undefined,
+  displaySchedules: { [taskId: string]: { start: string; end: string } }
+): AppState {
+  const task = state.tasks.find((t) => t.id === taskId)
+  if (!task) return state
+
+  // 1. Enter manual mode + backfill the task's CURRENT group (pre-move),
+  //    so its old siblings retain a coherent order after it leaves.
+  let next = ensureManualModeForGroup(state, taskId, displaySchedules)
+
+  // 2. Backfill the TARGET group too (it may be untouched), using the
+  //    (possibly already-updated) tasks array.
+  const targetGroupMembers = next.tasks.filter((t) => {
+    if (t.id === taskId) return false
+    return t.milestoneId === newMilestoneId && t.parentId === newParentId
+  })
+  if (!isGroupBackfilled(targetGroupMembers)) {
+    next = {
+      ...next,
+      tasks: backfillGroupOrders(next.tasks, targetGroupMembers, next.sortKey, next.sortDir, displaySchedules),
+    }
+  }
+
+  // 3. Compute the new order value from the (now-backfilled) neighbors.
+  const beforeOrder = beforeTaskId ? next.tasks.find((t) => t.id === beforeTaskId)?.order : undefined
+  const afterOrder = afterTaskId ? next.tasks.find((t) => t.id === afterTaskId)?.order : undefined
+  const newOrder = computeOrderBetween(beforeOrder, afterOrder)
+
+  // 4. Apply: move the task, propagate milestoneId through the WHOLE subtree, assign order.
+  const milestoneChanged = task.milestoneId !== newMilestoneId
+  const descendantIds = new Set<string>()
+  if (milestoneChanged) {
+    const collect = (pid: string) => {
+      next.tasks.forEach((t) => {
+        if (t.parentId === pid) {
+          descendantIds.add(t.id)
+          collect(t.id)
+        }
+      })
+    }
+    collect(taskId)
+  }
+
+  const tasks = next.tasks.map((t) => {
+    if (t.id === taskId) {
+      return { ...t, milestoneId: newMilestoneId, parentId: newParentId, order: newOrder }
+    }
+    if (descendantIds.has(t.id)) {
+      return { ...t, milestoneId: newMilestoneId }
+    }
+    return t
+  })
+
+  return { ...next, tasks }
+}
+
+/**
  * Toggle the expanded state of a task by ID.
  */
 export function toggleExpand(state: AppState, taskId: string): AppState {
@@ -345,6 +440,7 @@ export function toggleExpand(state: AppState, taskId: string): AppState {
 /**
  * Indent a task under the previous same-milestone sibling (only if sibling exists and task has no parent).
  * Also expands the parent to show the indented task.
+ * If in manual mode, assigns an order at the end of the new parent's children.
  */
 export function indentTask(state: AppState, taskId: string): AppState {
   const tasks = state.tasks
@@ -367,8 +463,24 @@ export function indentTask(state: AppState, taskId: string): AppState {
 
   if (!prev) return state // No previous sibling found
 
+  // Compute manual order if in manual mode
+  const manualOrder = state.sortKey === 'manual'
+    ? (() => {
+        const newSiblings = tasks.filter((x) => x.parentId === prev!.id)
+        const maxOrder = newSiblings.reduce((m, s) => Math.max(m, s.order || 0), 0)
+        return computeOrderBetween(maxOrder || undefined, undefined)
+      })()
+    : undefined
+
   const newTasks = tasks.map((x) =>
-    x.id === taskId ? { ...x, parentId: prev!.id, milestoneId: prev!.milestoneId } : x
+    x.id === taskId
+      ? {
+          ...x,
+          parentId: prev!.id,
+          milestoneId: prev!.milestoneId,
+          ...(manualOrder !== undefined ? { order: manualOrder } : {}),
+        }
+      : x
   )
 
   return {
@@ -380,6 +492,7 @@ export function indentTask(state: AppState, taskId: string): AppState {
 
 /**
  * Outdent a task (remove parent) and re-splice after its former parent's last child.
+ * If in manual mode, assigns an order at the end of the new top-level group.
  */
 export function outdentTask(state: AppState, taskId: string): AppState {
   const tasks = state.tasks
@@ -388,8 +501,25 @@ export function outdentTask(state: AppState, taskId: string): AppState {
 
   const parentId = t.parentId
 
-  // Remove parent from the task
-  const promoted = tasks.map((x) => (x.id === taskId ? { ...x, parentId: null } : x))
+  // Compute manual order if in manual mode
+  const manualOrder = state.sortKey === 'manual'
+    ? (() => {
+        const topLevelSiblings = tasks.filter((x) => x.parentId === null && x.id !== taskId)
+        const maxOrder = topLevelSiblings.reduce((m, s) => Math.max(m, s.order || 0), 0)
+        return computeOrderBetween(maxOrder || undefined, undefined)
+      })()
+    : undefined
+
+  // Remove parent from the task and assign order if in manual mode
+  const promoted = tasks.map((x) =>
+    x.id === taskId
+      ? {
+          ...x,
+          parentId: null,
+          ...(manualOrder !== undefined ? { order: manualOrder } : {}),
+        }
+      : x
+  )
 
   // Create a temporary array without the promoted task
   const withoutT = promoted.filter((x) => x.id !== taskId)
@@ -759,6 +889,43 @@ export function addTask(state: AppState, name: string): AppState {
   const assignee = anchor ? anchor.assignee : 'Unassigned'
   const startDate = anchor ? anchor.startDate : TODAY
 
+  // Compute order: assign a real order if the anchor's group is backfilled
+  let order = 0
+  if (anchor) {
+    const group = getSiblingGroup(state.tasks, state.milestones, anchor)
+    if (isGroupBackfilled(group)) {
+      const groupSortedByOrder = [...group].sort((a, b) => a.order - b.order)
+      const anchorIdx = groupSortedByOrder.findIndex((t) => t.id === anchor.id)
+      const nextSibling = groupSortedByOrder[anchorIdx + 1]
+      order = computeOrderBetween(anchor.order, nextSibling?.order)
+    }
+  } else {
+    // No anchor: append to global end with appropriate order if that milestone group is backfilled
+    const targetMilestoneId = milestoneId
+    const targetParentId = parentId
+    const tempTask: Task = {
+      id: '__temp__',
+      name: '',
+      milestoneId: targetMilestoneId,
+      parentId: targetParentId,
+      category: '',
+      assignee: '',
+      status: 'Not Started',
+      estimate: 1,
+      startDate: TODAY,
+      progress: 0,
+      order: 0,
+      dependencies: [],
+      comments: [],
+    }
+    const group = getSiblingGroup(state.tasks, state.milestones, tempTask)
+    if (isGroupBackfilled(group)) {
+      const groupSortedByOrder = [...group].sort((a, b) => a.order - b.order)
+      const lastMember = groupSortedByOrder[groupSortedByOrder.length - 1]
+      order = computeOrderBetween(lastMember?.order, undefined)
+    }
+  }
+
   const task: Task = {
     id: taskId,
     name,
@@ -770,6 +937,7 @@ export function addTask(state: AppState, name: string): AppState {
     estimate: 3,
     startDate,
     progress: 0,
+    order,
     dependencies: [],
     comments: [],
   }
@@ -827,6 +995,7 @@ export function addSubtask(state: AppState, parentTaskId: string, name: string):
     estimate: 2,
     startDate: parent.startDate,
     progress: 0,
+    order: 0,
     dependencies: [],
     comments: [],
   }

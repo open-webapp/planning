@@ -15,6 +15,7 @@ function createTask(overrides: Partial<Task> = {}): Task {
     estimate: overrides.estimate ?? 0,
     startDate: overrides.startDate || '2024-01-01',
     progress: overrides.progress ?? 0,
+    order: overrides.order ?? 0,
     dependencies: overrides.dependencies || [],
     comments: overrides.comments || [],
   }

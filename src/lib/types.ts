@@ -16,6 +16,7 @@ export interface Task {
   estimate: number // days
   startDate: string // YYYY-MM-DD
   progress: number // 0-100
+  order: number // manual sort position within a (milestoneId, parentId) sibling group
   dependencies: string[] // array of task ids
   comments: Comment[]
   notes?: string

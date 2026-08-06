@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
-import { ChevronDown, ChevronRight, Trash2, MessageSquare } from 'lucide-react'
+import { ChevronDown, ChevronRight, Trash2, MessageSquare, GripVertical } from 'lucide-react'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type { Task } from '../lib/types'
 import type { AppState } from '../lib/state'
 import { formatDate } from '../lib/dates'
@@ -17,8 +18,10 @@ interface TaskRowProps {
   isCritical: boolean
   hasChildren: boolean
   isExpanded: boolean
+  isSelected: boolean
   state: AppState
   dispatch: (action: any) => void
+  dragDisabled?: boolean
 }
 
 // Shared "transparent until hover/focus" styling used for the inline-editable
@@ -37,11 +40,22 @@ const TaskRow: React.FC<TaskRowProps> = ({
   isCritical,
   hasChildren,
   isExpanded,
+  isSelected,
+  dragDisabled = false,
   state,
   dispatch,
 }) => {
   const [newName, setNewName] = useState(task.name)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+    disabled: dragDisabled,
+  })
+
+  const { setNodeRef: setDroppableRef } = useDroppable({
+    id: task.id,
+  })
 
   useEffect(() => {
     setNewName(task.name)
@@ -378,9 +392,27 @@ const TaskRow: React.FC<TaskRowProps> = ({
 
   return (
     <div
-      className="flex border-b border-divider transition-colors hover:bg-ink-50"
+      ref={setDroppableRef}
+      className={`flex group border-b border-divider transition-colors hover:bg-ink-50 cursor-pointer ${
+        isSelected ? 'bg-[color-mix(in_srgb,var(--ns-netskope-blue)_8%,white)]' : ''
+      }`}
       style={{ width: `${width}px`, ...boxShadowStyle }}
+      onClick={() => dispatch({ type: 'SELECT_TASK', taskId: task.id })}
     >
+      <div
+        ref={setNodeRef}
+        className={`flex flex-shrink-0 items-center justify-center w-4 text-fg-3 opacity-0 group-hover:opacity-100 transition-opacity ${
+          dragDisabled ? 'cursor-not-allowed opacity-30' : 'cursor-grab active:cursor-grabbing'
+        }`}
+        title={dragDisabled ? 'Clear filters to reorder' : 'Drag to reorder'}
+        {...(dragDisabled ? {} : listeners)}
+        {...(dragDisabled ? {} : attributes)}
+        style={{
+          opacity: isDragging ? 0.5 : undefined,
+        }}
+      >
+        <GripVertical size={13} />
+      </div>
       {columns.map((col) => (
         <div
           key={col.name}

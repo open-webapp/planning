@@ -19,6 +19,7 @@ function makeTask(overrides: Partial<Task>): Task {
     estimate: 3,
     startDate: '2026-08-01',
     progress: 0,
+    order: 0,
     dependencies: [],
     comments: [],
     ...overrides,
@@ -87,6 +88,7 @@ describe('TasksView', () => {
         estimate: 3,
         startDate: '2026-01-01',
         progress: 0,
+        order: 0,
         dependencies: [],
         comments: [],
       },
@@ -101,6 +103,7 @@ describe('TasksView', () => {
         estimate: 5,
         startDate: '2026-01-05',
         progress: 50,
+        order: 0,
         dependencies: [],
         comments: [],
       },
@@ -115,6 +118,7 @@ describe('TasksView', () => {
         estimate: 2,
         startDate: '2026-01-02',
         progress: 100,
+        order: 0,
         dependencies: [],
         comments: [],
       },
@@ -641,4 +645,5 @@ describe('TasksView', () => {
     const expandButtonAgain = screen.getByText(/\+2 more/)
     expect(expandButtonAgain).toBeTruthy()
   })
+
 })

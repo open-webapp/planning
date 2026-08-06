@@ -1,4 +1,6 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
+import { DndContext } from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
 import type { DerivedData } from '../lib/selectors'
 import type { AppState } from '../lib/state'
 import type { Task, Milestone } from '../lib/types'
@@ -15,6 +17,38 @@ interface TasksViewProps {
   displaySchedules: { [taskId: string]: { start: string; end: string } }
   progressMap: { [taskId: string]: number }
   criticalSet: Set<string>
+}
+
+function computeMoveTarget(
+  targetTaskId: string,
+  dropBefore: boolean,
+  taskRows: Array<{ id: string; type: 'milestone' | 'task'; level: number }>,
+  tasks: Task[]
+): {
+  newMilestoneId: string | null
+  newParentId: string | null
+  beforeTaskId?: string
+  afterTaskId?: string
+} | null {
+  const targetTask = tasks.find((t) => t.id === targetTaskId)
+  if (!targetTask) return null
+  const level = taskRows.find((r) => r.id === targetTaskId)?.level
+  const sameDepthRows = taskRows.filter((r) => r.level === level)
+  const idx = sameDepthRows.findIndex((r) => r.id === targetTaskId)
+
+  const beforeTaskId = dropBefore
+    ? sameDepthRows[idx - 1]?.id
+    : targetTaskId
+  const afterTaskId = dropBefore
+    ? targetTaskId
+    : sameDepthRows[idx + 1]?.id
+
+  return {
+    newMilestoneId: targetTask.milestoneId,
+    newParentId: targetTask.parentId,
+    beforeTaskId,
+    afterTaskId,
+  }
 }
 
 interface MilestoneRowProps {
@@ -111,6 +145,97 @@ const TasksView: React.FC<TasksViewProps> = ({
     () => computeUpcomingMilestones(filteredTasks, state.milestones, displaySchedules, progressMap),
     [filteredTasks, state.milestones, displaySchedules, progressMap]
   )
+
+  // Check if any filter is active (used for disabling reorder/drag)
+  const anyFilterActive = useMemo(
+    () =>
+      !!(state.filters.status && state.filters.status !== 'All') ||
+      !!(state.filters.category && state.filters.category !== 'All') ||
+      !!(state.filters.assignee && state.filters.assignee !== 'All') ||
+      !!(state.filters.milestone && state.filters.milestone !== 'All') ||
+      !!(state.filters.search && state.filters.search.trim()),
+    [state.filters]
+  )
+
+  // Arrow key listener: plain Up/Down move the row selection, Alt+Arrow reorders/indents.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const tag = target.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return // don't hijack in-place editing
+
+      // Plain Up/Down: move selection to the previous/next visible task row.
+      if (!e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        const taskRows = rowMap.visibleRows.filter((r) => r.type === 'task')
+        if (taskRows.length === 0) return
+        e.preventDefault()
+
+        const currentIdx = state.selectedTaskId
+          ? taskRows.findIndex((r) => r.id === state.selectedTaskId)
+          : -1
+        const targetIdx = e.key === 'ArrowUp' ? currentIdx - 1 : currentIdx + 1
+        const clampedIdx = Math.max(0, Math.min(taskRows.length - 1, targetIdx))
+        dispatch({ type: 'SELECT_TASK', taskId: taskRows[clampedIdx].id })
+        return
+      }
+
+      if (!e.altKey) return
+      if (!state.selectedTaskId) return
+
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return
+      e.preventDefault()
+
+      // Handle Left/Right (indent/outdent)
+      if (e.key === 'ArrowLeft') {
+        dispatch({ type: 'OUTDENT_TASK', taskId: state.selectedTaskId })
+        return
+      }
+      if (e.key === 'ArrowRight') {
+        dispatch({ type: 'INDENT_TASK', taskId: state.selectedTaskId })
+        return
+      }
+
+      // Up/Down: reorder within/across same-depth sibling groups. Disabled under filters.
+      if (anyFilterActive) return
+
+      const taskRows = rowMap.visibleRows.filter((r) => r.type === 'task')
+      const selectedTask = getTaskById(state.selectedTaskId)
+      if (!selectedTask) return
+      const currentRowIdx = taskRows.findIndex((r) => r.id === state.selectedTaskId)
+      if (currentRowIdx < 0) return
+      const currentLevel = taskRows[currentRowIdx].level
+
+      // Same-depth rows only, preserving flattened top-to-bottom order.
+      const sameDepthRows = taskRows.filter((r) => r.level === currentLevel)
+      const sameDepthIdx = sameDepthRows.findIndex((r) => r.id === state.selectedTaskId)
+      const targetIdx = e.key === 'ArrowUp' ? sameDepthIdx - 1 : sameDepthIdx + 1
+      if (targetIdx < 0 || targetIdx >= sameDepthRows.length) return // already at an edge, no-op
+
+      const targetTask = getTaskById(sameDepthRows[targetIdx].id)
+      if (!targetTask) return
+
+      // Determine before/after neighbors at the target position
+      const beforeTaskId = e.key === 'ArrowUp'
+        ? (sameDepthRows[targetIdx - 1] ? sameDepthRows[targetIdx - 1].id : undefined)
+        : targetTask.id
+      const afterTaskId = e.key === 'ArrowUp'
+        ? targetTask.id
+        : (sameDepthRows[targetIdx + 1] ? sameDepthRows[targetIdx + 1].id : undefined)
+
+      dispatch({
+        type: 'MOVE_TASK_TO_POSITION',
+        taskId: state.selectedTaskId,
+        newMilestoneId: targetTask.milestoneId,
+        newParentId: targetTask.parentId,
+        beforeTaskId,
+        afterTaskId,
+        displaySchedules,
+      })
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [state.selectedTaskId, anyFilterActive, rowMap, displaySchedules, dispatch])
 
   const columns = [
     { name: 'number', label: '#', key: 'number' },
@@ -344,42 +469,89 @@ const TasksView: React.FC<TasksViewProps> = ({
           </div>
 
           {/* Body */}
-          <div>
-            {rowMap.visibleRows.map((row) => {
-              if (row.type === 'milestone') {
-                const milestone = getMilestoneById(row.id)
-                if (!milestone) return null
-                return (
-                  <MilestoneRow
-                    key={`milestone-${row.id}`}
-                    milestone={milestone}
-                    width={totalWidth}
-                    dispatch={dispatch}
-                  />
-                )
-              } else {
-                const task = getTaskById(row.id)
-                if (!task) return null
-                return (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    taskNumber={rowMap.rowNumberMap[task.id] || 0}
-                    level={row.level}
-                    columns={columns}
-                    getColumnWidth={getColumnWidth}
-                    displaySchedules={displaySchedules}
-                    progress={progressMap[task.id] || 0}
-                    isCritical={criticalSet.has(task.id)}
-                    hasChildren={state.tasks.some((t) => t.parentId === task.id)}
-                    isExpanded={state.expanded[task.id] !== false}
-                    state={state}
-                    dispatch={dispatch}
-                  />
-                )
+          <DndContext
+            onDragEnd={(event: DragEndEvent) => {
+              if (!event.over) return
+              const activeTaskId = event.active.id as string
+              const targetTaskId = event.over.id as string
+              if (!targetTaskId || activeTaskId === targetTaskId) return
+
+              // Prevent dropping a task onto its own descendant
+              const isDescendantOf = (childId: string, ancestorId: string): boolean => {
+                let current = state.tasks.find((t) => t.id === childId)
+                while (current?.parentId) {
+                  if (current.parentId === ancestorId) return true
+                  const nextCurrent = state.tasks.find((t) => t.id === current!.parentId)
+                  if (!nextCurrent) break
+                  current = nextCurrent
+                }
+                return false
               }
-            })}
-          </div>
+              if (isDescendantOf(activeTaskId, targetTaskId)) return
+
+              // Determine drop position based on pointer Y coordinate vs target row midpoint
+              const activeRect = event.active.rect.current?.translated
+              const overRect = event.over.rect
+              if (!activeRect || !overRect) return
+
+              const activeCenterY = activeRect.top + activeRect.height / 2
+              const overCenterY = overRect.top + overRect.height / 2
+              const dropBefore = activeCenterY < overCenterY
+
+              const taskRows = rowMap.visibleRows
+              const moveTarget = computeMoveTarget(targetTaskId, dropBefore, taskRows, state.tasks)
+              if (!moveTarget) return
+
+              dispatch({
+                type: 'MOVE_TASK_TO_POSITION',
+                taskId: activeTaskId,
+                newMilestoneId: moveTarget.newMilestoneId,
+                newParentId: moveTarget.newParentId,
+                beforeTaskId: moveTarget.beforeTaskId,
+                afterTaskId: moveTarget.afterTaskId,
+                displaySchedules,
+              })
+            }}
+          >
+            <div>
+              {rowMap.visibleRows.map((row) => {
+                if (row.type === 'milestone') {
+                  const milestone = getMilestoneById(row.id)
+                  if (!milestone) return null
+                  return (
+                    <MilestoneRow
+                      key={`milestone-${row.id}`}
+                      milestone={milestone}
+                      width={totalWidth}
+                      dispatch={dispatch}
+                    />
+                  )
+                } else {
+                  const task = getTaskById(row.id)
+                  if (!task) return null
+                  return (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      taskNumber={rowMap.rowNumberMap[task.id] || 0}
+                      level={row.level}
+                      columns={columns}
+                      getColumnWidth={getColumnWidth}
+                      displaySchedules={displaySchedules}
+                      progress={progressMap[task.id] || 0}
+                      isCritical={criticalSet.has(task.id)}
+                      hasChildren={state.tasks.some((t) => t.parentId === task.id)}
+                      isExpanded={state.expanded[task.id] !== false}
+                      isSelected={state.selectedTaskId === task.id}
+                      dragDisabled={anyFilterActive}
+                      state={state}
+                      dispatch={dispatch}
+                    />
+                  )
+                }
+              })}
+            </div>
+          </DndContext>
         </div>
       </div>
     </div>

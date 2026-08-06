@@ -105,6 +105,7 @@ describe('CSV Export', () => {
         estimate: 0,
         startDate: '',
         progress: 0,
+        order: 0,
         dependencies: ['t2', 't3'],
         comments: [],
       };
@@ -120,6 +121,7 @@ describe('CSV Export', () => {
         estimate: 0,
         startDate: '',
         progress: 0,
+        order: 0,
         dependencies: [],
         comments: [],
       };
@@ -135,6 +137,7 @@ describe('CSV Export', () => {
         estimate: 0,
         startDate: '',
         progress: 0,
+        order: 0,
         dependencies: [],
         comments: [],
       };
@@ -170,6 +173,7 @@ describe('CSV Export', () => {
         estimate: 5,
         startDate: '2024-12-01',
         progress: 0,
+        order: 0,
         dependencies: [],
         comments: [],
       };
@@ -208,6 +212,7 @@ describe('CSV Export', () => {
         estimate: 0,
         startDate: '',
         progress: 0,
+        order: 0,
         dependencies: [],
         comments: [],
       };
@@ -239,6 +244,7 @@ describe('CSV Export', () => {
         estimate: 0,
         startDate: '',
         progress: 0,
+        order: 0,
         dependencies: [],
         comments: [],
       };
@@ -275,6 +281,7 @@ describe('CSV Export', () => {
         estimate: 3,
         startDate: '2024-12-01',
         progress: 50,
+        order: 0,
         dependencies: [],
         comments: [],
       };
@@ -290,6 +297,7 @@ describe('CSV Export', () => {
         estimate: 5,
         startDate: '2024-12-05',
         progress: 0,
+        order: 0,
         dependencies: ['t1'],
         comments: [],
       };
@@ -349,6 +357,7 @@ describe('CSV Export', () => {
         estimate: 5,
         startDate: '2024-12-01',
         progress: 50,
+        order: 0,
         dependencies: ['t2'],
         comments: [],
       };
@@ -364,6 +373,7 @@ describe('CSV Export', () => {
         estimate: 3,
         startDate: '2024-12-05',
         progress: 0,
+        order: 0,
         dependencies: [],
         comments: [],
       };

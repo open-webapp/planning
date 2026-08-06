@@ -97,6 +97,7 @@ export function parseTasksCsvString(csvText: string, existingMilestones: Milesto
       startDate: row['Start Date'] || '',
       estimate: parseInt(row['Estimate (days)']) || 0,
       progress: parseInt(row['Progress %']) || 0,
+      order: 0,
       dependencies: deps,
       comments: [],
       notes: undefined
