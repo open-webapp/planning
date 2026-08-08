@@ -112,6 +112,14 @@ export function computeRowMap(
     numberToId[rowNumberMap[id]] = id
   })
 
+  // Validate: all task IDs in visibleRows should exist in input tasks
+  const taskIdSet = new Set(tasks.map(t => t.id))
+  const visibleTaskIds = visibleRows.filter(r => r.type === 'task').map(r => r.id)
+  const missingTasks = visibleTaskIds.filter(id => !taskIdSet.has(id))
+  if (missingTasks.length > 0) {
+    console.error('[BUG] visibleRows contains task IDs not in input tasks:', missingTasks)
+  }
+
   return {
     rowNumberMap,
     numberToId,

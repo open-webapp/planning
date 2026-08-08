@@ -514,7 +514,13 @@ const TasksView: React.FC<TasksViewProps> = ({
             }}
           >
             <div>
-              {rowMap.visibleRows.map((row) => {
+              {rowMap.visibleRows.filter((row) => {
+                if (row.type === 'milestone') {
+                  return state.milestones.some(m => m.id === row.id)
+                } else {
+                  return state.tasks.some(t => t.id === row.id)
+                }
+              }).map((row) => {
                 if (row.type === 'milestone') {
                   const milestone = getMilestoneById(row.id)
                   if (!milestone) return null
