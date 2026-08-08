@@ -101,7 +101,7 @@ export function computeRowMap(
   // Tasks not tied to any existing milestone (e.g. no milestones created yet)
   // still need to be rendered, otherwise they're added but never shown.
   const milestoneIds = new Set(milestones.map((m) => m.id))
-  const unassignedTopLevel = tasks.filter((t) => !t.parentId && !milestoneIds.has(t.milestoneId as string))
+  const unassignedTopLevel = tasks.filter((t) => !t.parentId && (t.milestoneId === null || !milestoneIds.has(t.milestoneId)))
   const sortedUnassigned = sortSiblings(unassignedTopLevel, null, sortKey, sortDir, displaySchedules)
 
   sortedUnassigned.forEach((t) => walk(t, 0, visibleRows))
