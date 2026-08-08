@@ -3,10 +3,28 @@ import { diffAgainstSnapshot, threeWayMerge, applyResolutions, syncNow, resolveS
 import type { Task, Milestone } from './types'
 import type { AppState } from './state'
 
-vi.mock('./googleAuth', () => ({
-  getAccessToken: vi.fn().mockResolvedValue('fake-token'),
-  getDriveCsvContent: vi.fn().mockResolvedValue(null),
-  updateDriveCsvFile: vi.fn().mockRejectedValue(new Error('Push failed: 403 - forbidden')),
+// sync.ts calls drive.project(projectId).files.read/write directly (no more
+// token-threading through getAccessToken from the old googleAuth.ts). We mock
+// the app's './drive' module itself, rather than reaching for the library's
+// real IndexedDB/GIS-backed testing fakes here: sync.ts's own Drive calls are
+// non-interactive reads/writes against an already-connected project, so
+// there's no auth flow or folder-walk worth exercising through the real
+// fakes in THIS file — that coverage lives in drive.test.ts (folderPath pin)
+// and the library's own regression suite. Mocking at this boundary keeps
+// every 3-way-merge assertion below byte-identical to before the library
+// swap; only this mock changed.
+const filesRead = vi.fn().mockResolvedValue(null)
+const filesWrite = vi.fn().mockRejectedValue(new Error('Push failed: 403 - forbidden'))
+
+vi.mock('./drive', () => ({
+  drive: {
+    project: () => ({
+      files: {
+        read: (...args: unknown[]) => filesRead(...args),
+        write: (...args: unknown[]) => filesWrite(...args),
+      },
+    }),
+  },
 }))
 
 vi.mock('./csv', () => ({
@@ -593,12 +611,11 @@ describe('sync engine', () => {
   })
 
   it('does not wipe browser tasks when the Drive pull comes back empty despite an existing snapshot', async () => {
-    // Reproduces the reported bug: getDriveCsvContent returning null for a
+    // Reproduces the reported bug: files.read() returning null for a
     // project that has synced before (non-empty lastSyncedSnapshot) used to make threeWayMerge
     // treat every task as "deleted on the Drive side" and wipe them from the browser too.
-    const { getDriveCsvContent, updateDriveCsvFile } = await import('./googleAuth')
-    vi.mocked(getDriveCsvContent).mockResolvedValueOnce(null)
-    vi.mocked(updateDriveCsvFile).mockResolvedValueOnce(undefined)
+    filesRead.mockResolvedValueOnce(null)
+    filesWrite.mockResolvedValueOnce({ id: 'drive-file-1' })
 
     const existingTasks = [createTask('a'), createTask('b')]
     const snapshot = { tasks: existingTasks, milestones: [] }
@@ -628,8 +645,7 @@ describe('sync engine', () => {
   })
 
   it('resolveSyncConflicts applies "drive" choices and pushes the resolved data (accept-drive did nothing before this fix)', async () => {
-    const { updateDriveCsvFile } = await import('./googleAuth')
-    vi.mocked(updateDriveCsvFile).mockResolvedValueOnce(undefined)
+    filesWrite.mockResolvedValueOnce({ id: 'drive-file-1' })
 
     const pendingMerge = {
       tasks: [createTask('a', { name: 'Browser Name', status: 'In Progress' })],

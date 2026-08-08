@@ -139,6 +139,9 @@ export function appReducer(state: AppState, action: Action): AppState {
       return StateActions.setSettingsTab(state, action.tab)
 
     // Google Auth (per-project)
+    case 'HYDRATE_AUTH_BY_PROJECT':
+      return { ...state, authByProject: action.authByProject }
+
     case 'REQUEST_GOOGLE_TOKEN':
       return { ...state, googleBusy: true, googleStatus: 'Connecting...' }
 
@@ -153,7 +156,7 @@ export function appReducer(state: AppState, action: Action): AppState {
       return StateActions.clearProjectGoogleAuth(state)
 
     case 'SYNC_STARTED':
-      return { ...state, syncBusy: true, syncStatus: undefined, syncConflicts: [] }
+      return { ...state, syncBusy: true, syncStatus: undefined, syncError: undefined, syncConflicts: [] }
 
     case 'SYNC_CONFLICTS_DETECTED':
       return {
@@ -189,6 +192,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...StateActions.mergeCustomValuesFromTasks(state, action.tasks),
         syncBusy: false,
         syncStatus: `Synced at ${syncTime}`,
+        syncError: undefined,
         tasks: action.tasks,
         milestones: action.milestones,
         syncConflicts: [],
@@ -206,10 +210,10 @@ export function appReducer(state: AppState, action: Action): AppState {
     }
 
     case 'SYNC_ERROR':
-      return { ...state, syncBusy: false, syncStatus: action.error }
+      return { ...state, syncBusy: false, syncStatus: action.error, syncError: action.rawError }
 
     case 'CLEAR_SYNC_STATUS':
-      return { ...state, syncStatus: undefined }
+      return { ...state, syncStatus: undefined, syncError: undefined }
 
     case 'GOOGLE_TOKEN_ERROR':
       return { ...state, googleBusy: false, googleStatus: action.error }

@@ -1,7 +1,28 @@
 import type { Task, Milestone, SyncConflict } from './types'
 import type { AppState } from './state'
-import { getAccessToken, getDriveCsvContent, updateDriveCsvFile } from './googleAuth'
+import { drive } from './drive'
 import { parseTasksCsvString, buildTasksCsvString } from './csv'
+
+/**
+ * Reads a project's synced CSV file from Drive. Returns null on a missing
+ * file (mirrors the old googleAuth.ts getDriveCsvContent's 404 -> null
+ * contract) — Drive's files.read() already returns null on 404, and a Blob
+ * result (unexpected for a text/csv file) is treated the same as "no text
+ * content available" rather than thrown.
+ */
+async function getDriveCsvContent(fileId: string, projectId: string): Promise<string | null> {
+  const content = await drive.project(projectId).files.read(fileId)
+  if (content === null) return null
+  return typeof content === 'string' ? content : null
+}
+
+async function updateDriveCsvFile(fileId: string, csvContent: string, projectId: string): Promise<void> {
+  await drive.project(projectId).files.write({
+    fileId,
+    content: csvContent,
+    mimeType: 'text/csv',
+  })
+}
 
 /**
  * Represents changes (diffs) against a snapshot, per entity (task or milestone).
@@ -537,11 +558,8 @@ export async function syncNow(
       throw new Error('No Drive file ID configured for this project')
     }
 
-    // Get access token for this project
-    const token = await getAccessToken(projectId)
-
     // Pull CSV data from Drive
-    const csvText = await getDriveCsvContent(activeProject.driveFileId, token, projectId)
+    const csvText = await getDriveCsvContent(activeProject.driveFileId, projectId)
     let sheetData: { tasks: Task[]; milestones: Milestone[] }
     if (csvText !== null) {
       sheetData = parseTasksCsvString(csvText, state.milestones)
@@ -599,17 +617,17 @@ export async function syncNow(
     // Handle conflicts or success
     if (conflicts.length === 0) {
       // No conflicts: push merged data to Drive CSV
-      let pushResult: { success: boolean; message: string }
+      let pushResult: { success: boolean; message: string; rawError?: unknown }
       try {
-        await updateDriveCsvFile(activeProject.driveFileId, buildTasksCsvString(merged.tasks, merged.milestones), token, projectId)
+        await updateDriveCsvFile(activeProject.driveFileId, buildTasksCsvString(merged.tasks, merged.milestones), projectId)
         pushResult = { success: true, message: 'Sync completed successfully' }
       } catch (pushError) {
         const errorMsg = pushError instanceof Error ? pushError.message : String(pushError)
-        pushResult = { success: false, message: errorMsg }
+        pushResult = { success: false, message: errorMsg, rawError: pushError }
       }
 
       if (!pushResult.success) {
-        dispatch({ type: 'SYNC_ERROR', error: pushResult.message })
+        dispatch({ type: 'SYNC_ERROR', error: pushResult.message, rawError: pushResult.rawError })
         return
       }
 
@@ -649,6 +667,7 @@ export async function syncNow(
     dispatch({
       type: 'SYNC_ERROR',
       error: errorMessage,
+      rawError: error,
     })
   }
 }
@@ -676,11 +695,9 @@ export async function resolveSyncConflicts(
 
     const resolved = applyResolutions(state.syncPendingMerge, state.syncConflicts, choices)
 
-    const token = await getAccessToken(projectId)
     await updateDriveCsvFile(
       activeProject.driveFileId,
       buildTasksCsvString(resolved.tasks, resolved.milestones),
-      token,
       projectId
     )
 
@@ -708,6 +725,7 @@ export async function resolveSyncConflicts(
     dispatch({
       type: 'SYNC_ERROR',
       error: errorMessage,
+      rawError: error,
     })
   }
 }

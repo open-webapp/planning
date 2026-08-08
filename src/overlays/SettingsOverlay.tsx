@@ -3,7 +3,7 @@ import { X, Loader, Trash2 } from 'lucide-react'
 import type { AppState } from '../lib/state'
 import { syncNow } from '../lib/sync'
 import { parseSyncError } from '../lib/syncErrors'
-import { connectDriveSync, getAccessToken } from '../lib/googleAuth'
+import { connectDriveSync } from '../lib/drive'
 import { exportTasksCsv } from '../lib/csv'
 
 interface SettingsOverlayProps {
@@ -30,9 +30,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
     if (!activeProject || !state.authByProject[activeProject.id]) return
 
     try {
-      const token = await getAccessToken(activeProject.id)
       const driveFileId = await connectDriveSync(
-        token,
         state.tasks,
         state.milestones,
         activeProject.name,
@@ -49,16 +47,14 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
   }, [state, dispatch])
 
   const handleConnectGoogle = useCallback(() => {
-    // Phase 6: requestAccessToken() from lib/googleAuth.ts
-    // For now, dispatch a stub action
+    // Handled by App.tsx's dispatch wrapper: drive.project(id).connect().
     dispatch({
       type: 'REQUEST_GOOGLE_TOKEN',
     })
   }, [dispatch])
 
   const handleDisconnectGoogle = useCallback(() => {
-    // Phase 6: revokeToken() from lib/googleAuth.ts
-    // For now, clear tokens and close overlay
+    // Handled by App.tsx's dispatch wrapper: drive.project(id).disconnect().
     dispatch({
       type: 'REVOKE_GOOGLE_TOKEN',
     })
@@ -276,7 +272,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
                     {/* Status Text */}
                     {state.syncStatus && !state.syncBusy && (() => {
                       const isSuccess = state.syncStatus.startsWith('Synced at')
-                      const friendlyError = isSuccess ? null : parseSyncError(state.syncStatus)
+                      // Prefer the raw thrown value (often a typed drive-sync error) so
+                      // parseSyncError can branch on error shape; fall back to the plain
+                      // string message when no raw error was captured (e.g. the
+                      // "project switched mid-sync" cancellation, which never throws).
+                      const friendlyError = isSuccess ? null : parseSyncError(state.syncError ?? state.syncStatus)
                       return (
                         <div className={`text-xs mt-[6px] ${isSuccess ? 'text-netskopeBlue' : 'text-rose-600'}`}>
                           {isSuccess ? state.syncStatus : friendlyError!.message}

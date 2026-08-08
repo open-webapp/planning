@@ -23,7 +23,7 @@ import {
   SyncConflictOverlay,
   SyncToast,
 } from './overlays'
-import { requestAccessToken, revokeToken, connectDriveSync } from './lib/googleAuth'
+import { drive, connectDriveSync } from './lib/drive'
 import { syncNow, resolveSyncConflicts } from './lib/sync'
 
 /**
@@ -37,7 +37,9 @@ function initializeState(): AppState {
       activeProjectId: persisted.activeProjectId || '',
       projects: persisted.projects || [],
       savedProjects: persisted.savedProjects || {},
-      authByProject: hydrateAuthByProject(persisted.projects || []),
+      // Hydrated asynchronously (drive-sync's connection state lives in IndexedDB) by
+      // the mount effect below, which dispatches HYDRATE_AUTH_BY_PROJECT once resolved.
+      authByProject: {},
       googleBusy: false,
       syncBusy: false,
       syncConflicts: [],
@@ -78,7 +80,8 @@ function initializeState(): AppState {
     activeProjectId: projectId,
     projects,
     savedProjects: {},
-    authByProject: hydrateAuthByProject(projects),
+    // Hydrated asynchronously by the mount effect below.
+    authByProject: {},
     googleBusy: false,
     syncBusy: false,
     syncConflicts: [],
@@ -124,91 +127,69 @@ function useAppDispatch(baseState: AppState, baseDispatch: React.Dispatch<Dispat
     // Handle async actions before dispatching to reducer
     if (action.type === 'REQUEST_GOOGLE_TOKEN') {
       const projectId = stateRef.current.activeProjectId
-      requestAccessToken(
-        projectId,
-        ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/userinfo.email'],
-        async (token: string) => {
-          try {
-            // Fetch user info to get email
-            const userInfoResponse = await fetch(
-              'https://www.googleapis.com/oauth2/v3/userinfo',
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            )
-            if (userInfoResponse.ok) {
-              const userInfo = await userInfoResponse.json()
-              baseDispatch({
-                type: 'SET_GOOGLE_TOKEN',
-                token,
-                email: userInfo.email,
-              })
+      drive
+        .project(projectId)
+        .connect()
+        .then(async (connection) => {
+          // connect() already resolves the account email — no manual
+          // oauth2/v3/userinfo fetch needed here.
+          baseDispatch({
+            type: 'SET_GOOGLE_TOKEN',
+            email: connection.email,
+          })
 
-              // Merge the two-step flow: provision this project's Drive file
-              // as part of the same click that connects the Google account.
-              const currentState = stateRef.current
-              const activeProject = currentState.projects.find(
-                (p) => p.id === currentState.activeProjectId
+          // Merge the two-step flow: provision this project's Drive file
+          // as part of the same click that connects the Google account.
+          const currentState = stateRef.current
+          const activeProject = currentState.projects.find(
+            (p) => p.id === currentState.activeProjectId
+          )
+          if (activeProject && !activeProject.driveFileId) {
+            try {
+              // Guard: ensure we have data to upload to Drive
+              const tasksToUpload = currentState.tasks || []
+              const milestonesToUpload = currentState.milestones || []
+
+              if (tasksToUpload.length === 0 && milestonesToUpload.length === 0) {
+                console.warn('No tasks or milestones to upload to Drive')
+              }
+
+              const driveFileId = await connectDriveSync(
+                tasksToUpload,
+                milestonesToUpload,
+                activeProject.name,
+                activeProject.id
               )
-              if (activeProject && !activeProject.driveFileId) {
-                try {
-                  // Guard: ensure we have data to upload to Drive
-                  const tasksToUpload = currentState.tasks || []
-                  const milestonesToUpload = currentState.milestones || []
-
-                  if (tasksToUpload.length === 0 && milestonesToUpload.length === 0) {
-                    console.warn('No tasks or milestones to upload to Drive')
-                  }
-
-                  const driveFileId = await connectDriveSync(
-                    token,
-                    tasksToUpload,
-                    milestonesToUpload,
-                    activeProject.name,
-                    activeProject.id
-                  )
-                  // Store the initial snapshot to prevent conflicts on first sync
-                  const snapshot = JSON.stringify({
-                    tasks: tasksToUpload,
-                    milestones: milestonesToUpload,
-                  })
-                  baseDispatch({
-                    type: 'UPDATE_PROJECT',
-                    projectId: activeProject.id,
-                    patch: { driveFileId, lastSyncedSnapshot: snapshot, lastSyncedAt: new Date().toISOString() },
-                  })
-                } catch (error) {
-                  console.error('Drive sync connection failed:', error)
-                }
-              }
-            } else {
-              baseDispatch({
-                type: 'GOOGLE_TOKEN_ERROR',
-                error: 'Failed to fetch user info',
+              // Store the initial snapshot to prevent conflicts on first sync
+              const snapshot = JSON.stringify({
+                tasks: tasksToUpload,
+                milestones: milestonesToUpload,
               })
+              baseDispatch({
+                type: 'UPDATE_PROJECT',
+                projectId: activeProject.id,
+                patch: { driveFileId, lastSyncedSnapshot: snapshot, lastSyncedAt: new Date().toISOString() },
+              })
+            } catch (error) {
+              console.error('Drive sync connection failed:', error)
             }
-          } catch (error) {
-            console.error('Error fetching user info:', error)
-            baseDispatch({
-              type: 'GOOGLE_TOKEN_ERROR',
-              error: 'Failed to fetch user info',
-            })
           }
-        }
-      ).catch((error) => {
-        console.error('Token request failed:', error)
-        baseDispatch({
-          type: 'GOOGLE_TOKEN_ERROR',
-          error: error.message,
         })
-      })
+        .catch((error) => {
+          console.error('Token request failed:', error)
+          baseDispatch({
+            type: 'GOOGLE_TOKEN_ERROR',
+            error: error.message,
+          })
+        })
     } else if (action.type === 'REVOKE_GOOGLE_TOKEN') {
       const projectId = stateRef.current.activeProjectId
-      // revokeToken() is safe to call unconditionally — it early-returns (after
-      // clearing any cached token) when there's nothing cached to revoke.
-      revokeToken(projectId)
+      // disconnect() is safe to call unconditionally — it early-returns the
+      // revoke POST (after clearing any cached token) when there's nothing
+      // cached to revoke.
+      drive
+        .project(projectId)
+        .disconnect()
         .then(() => {
           baseDispatch(action)
         })
@@ -234,6 +215,31 @@ function App() {
   useEffect(() => {
     savePersistedApp(state)
   }, [state])
+
+  // Boot-time drive-sync wiring: activate() attaches the visibility/pageshow
+  // listeners that drive background token warm-ups (disposed on unmount),
+  // reconcile() drops any per-project auth IndexedDB databases orphaned by a
+  // project deleted in a previous session, and hydrateAuthByProject() reads
+  // each known project's connection state so Settings/AppShell can render
+  // it. All three run once at mount against the project list as it stood at
+  // boot.
+  useEffect(() => {
+    const dispose = drive.activate()
+
+    const projectIds = state.projects.map((p) => p.id)
+    void drive.reconcile(projectIds)
+
+    hydrateAuthByProject(state.projects).then((authByProject) => {
+      baseDispatch({ type: 'HYDRATE_AUTH_BY_PROJECT', authByProject })
+    })
+
+    return () => {
+      dispose()
+    }
+    // Intentionally run once at mount: reconcile/hydrate should see the
+    // project list as loaded from storage, not re-run on every edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Compute scheduling and derived data
   const baseSchedules = computeBaseSchedules(state.tasks)

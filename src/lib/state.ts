@@ -2,7 +2,7 @@ import type { Task, Milestone, Project, Comment, SyncConflict } from './types'
 import { uid } from './seed'
 import { TODAY } from './dates'
 import { exportTasksCsv } from './csv'
-import { getAuthStatus } from './googleAuth'
+import { drive } from './drive'
 import {
   computeOrderBetween,
   getSiblingGroup,
@@ -17,9 +17,10 @@ export interface AppState {
   projects: Project[]
   savedProjects: { [projectId: string]: ProjectState } // per-project snapshots for inactive projects
 
-  // Google Auth & Backup (per-project). Hydrated at boot from googleAuth.ts's cached-token
-  // state; never persisted to localStorage — this is the single source of truth for
-  // connection status, replacing the old (buggy, double-persisted) Project.googleAccessToken.
+  // Google Auth & Backup (per-project). Hydrated at boot from @open-webapp/drive-sync's
+  // per-project connection state; never persisted to localStorage — this is the single
+  // source of truth for connection status, replacing the old (buggy, double-persisted)
+  // Project.googleAccessToken.
   authByProject: Record<string, { email: string; needsReauth: boolean }>
   googleBusy: boolean
   googleStatus?: string // 'connecting' | 'disconnecting' | error message
@@ -27,6 +28,10 @@ export interface AppState {
   // Sync State
   syncBusy: boolean // replaces conditionally reusing googleBusy
   syncStatus?: string // drives toast message, e.g. "Synced at 3:45 PM" or error string
+  // The raw thrown value (often a typed @open-webapp/drive-sync error) behind the
+  // last SYNC_ERROR's string message, so the UI can branch on error shape via
+  // parseSyncError() instead of re-deriving it from syncStatus's plain string.
+  syncError?: unknown
   syncConflicts: SyncConflict[] // empty when no conflict dialog open
   syncPendingMerge?: { tasks: Task[]; milestones: Milestone[] } // fully-merged result awaiting conflict resolution
 
@@ -151,7 +156,7 @@ export function snapshotForPersist(state: AppState): Partial<AppState> {
   PERSIST_STATE_KEYS.forEach(k => {
     (snap as any)[k] = (state as any)[k]
   })
-  // Add global state fields (note: auth tokens are per-project, stored separately in googleAuth.ts)
+  // Add global state fields (note: auth tokens are per-project, stored separately by drive-sync's IndexedDB storage)
   snap.projects = state.projects
   snap.activeProjectId = state.activeProjectId
   snap.activeView = state.activeView
@@ -210,18 +215,23 @@ export function loadPersistedApp(): Partial<AppState> | null {
 }
 
 /**
- * Hydrate authByProject at boot from googleAuth.ts's cached-token state, so components
- * render off state.authByProject without an async round-trip on first paint. Only the
- * "authenticated" bit is available synchronously (the email is re-learned on the next
- * connect/reauth); projects without a cached token get no entry, meaning disconnected.
+ * Hydrate authByProject at boot from drive-sync's per-project connection state
+ * (IndexedDB-backed, so unlike the old googleAuth.ts localStorage read this is
+ * necessarily async). Callers render with an empty authByProject on first paint
+ * and dispatch the resolved result once this settles — see App.tsx's mount
+ * effect and the 'HYDRATE_AUTH_BY_PROJECT' reducer case. Projects with no
+ * stored connection get no entry, meaning disconnected.
  */
-export function hydrateAuthByProject(projects: Project[]): AppState['authByProject'] {
+export async function hydrateAuthByProject(projects: Project[]): Promise<AppState['authByProject']> {
   const result: AppState['authByProject'] = {}
-  for (const project of projects) {
-    if (getAuthStatus(project.id).authenticated) {
-      result[project.id] = { email: '', needsReauth: false }
-    }
-  }
+  await Promise.all(
+    projects.map(async (project) => {
+      const conn = await drive.project(project.id).getConnection()
+      if (conn) {
+        result[project.id] = { email: conn.email, needsReauth: conn.needsReauth }
+      }
+    })
+  )
   return result
 }
 
@@ -1218,7 +1228,9 @@ export function closeSettings(state: AppState): AppState {
 }
 
 /**
- * Clear Google auth for the active project (token is removed in googleAuth.ts).
+ * Clear Google auth for the active project (token is removed by drive-sync's
+ * disconnect(), called by the REVOKE_GOOGLE_TOKEN handler in App.tsx before
+ * this reducer case runs).
  */
 export function clearProjectGoogleAuth(state: AppState): AppState {
   const authByProject = { ...state.authByProject }
