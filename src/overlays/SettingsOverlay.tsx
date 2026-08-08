@@ -3,7 +3,7 @@ import { X, Loader, Trash2 } from 'lucide-react'
 import type { AppState } from '../lib/state'
 import { syncNow } from '../lib/sync'
 import { parseSyncError } from '../lib/syncErrors'
-import { connectDriveSync } from '../lib/googleAuth'
+import { connectDriveSync, getAccessToken } from '../lib/googleAuth'
 import { exportTasksCsv } from '../lib/csv'
 
 interface SettingsOverlayProps {
@@ -27,11 +27,12 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
 
   const handleConnectDrive = useCallback(async () => {
     const activeProject = state.projects.find((p) => p.id === state.activeProjectId)
-    if (!activeProject || !activeProject.googleAccessToken) return
+    if (!activeProject || !state.authByProject[activeProject.id]) return
 
     try {
+      const token = await getAccessToken(activeProject.id)
       const driveFileId = await connectDriveSync(
-        activeProject.googleAccessToken,
+        token,
         state.tasks,
         state.milestones,
         activeProject.name,
@@ -87,8 +88,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
   }, [state])
 
   const activeProject = state.projects.find((p) => p.id === state.activeProjectId)
-  const isConnected = !!activeProject?.googleAccessToken
-  const canBackup = activeProject?.googleAccessToken && activeProject?.driveFileId
+  const activeAuth = activeProject ? state.authByProject[activeProject.id] : undefined
+  const isConnected = !!activeAuth
+  const canBackup = isConnected && !!activeProject?.driveFileId
 
   // Auto-provision the Drive file for the active project when switching to a project
   // that's already connected but hasn't been provisioned yet.
@@ -97,7 +99,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
   const autoConnectingRef = useRef(false)
   useEffect(() => {
     if (
-      activeProject?.googleAccessToken &&
+      isConnected &&
       activeProject &&
       !activeProject.driveFileId &&
       !autoConnectingRef.current
@@ -107,7 +109,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
         autoConnectingRef.current = false
       })
     }
-  }, [activeProject?.id, activeProject?.googleAccessToken, activeProject?.driveFileId])
+  }, [activeProject?.id, isConnected, activeProject?.driveFileId])
 
   return (
     <>
@@ -193,7 +195,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ state, dispatch, onDe
                         style={{ background: '#2BAE66' }}
                       />
                       <span className="text-[0.8125rem] text-fg-1">
-                        {activeProject?.googleUserEmail || 'Connected'}
+                        {activeAuth?.email || 'Connected'}
                       </span>
                     </div>
                     <span

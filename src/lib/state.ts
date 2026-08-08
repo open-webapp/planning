@@ -2,6 +2,7 @@ import type { Task, Milestone, Project, Comment, SyncConflict } from './types'
 import { uid } from './seed'
 import { TODAY } from './dates'
 import { exportTasksCsv } from './csv'
+import { getAuthStatus } from './googleAuth'
 import {
   computeOrderBetween,
   getSiblingGroup,
@@ -16,7 +17,10 @@ export interface AppState {
   projects: Project[]
   savedProjects: { [projectId: string]: ProjectState } // per-project snapshots for inactive projects
 
-  // Google Auth & Backup (per-project, see Project type)
+  // Google Auth & Backup (per-project). Hydrated at boot from googleAuth.ts's cached-token
+  // state; never persisted to localStorage — this is the single source of truth for
+  // connection status, replacing the old (buggy, double-persisted) Project.googleAccessToken.
+  authByProject: Record<string, { email: string; needsReauth: boolean }>
   googleBusy: boolean
   googleStatus?: string // 'connecting' | 'disconnecting' | error message
 
@@ -158,17 +162,83 @@ export function snapshotForPersist(state: AppState): Partial<AppState> {
 // localStorage key for persisting app state
 export const APP_STORAGE_KEY = 'pma_app_state_v1'
 
-// Load persisted app state from localStorage
+// Load persisted app state from localStorage.
+// One-time boot cleanup: older builds mistakenly persisted Project.googleAccessToken /
+// Project.googleUserEmail into this blob (they're never supposed to be persisted — see
+// AppState.authByProject). Strip them from every project entry before use, and rewrite
+// the cleaned blob back to storage so subsequent loads are already clean. Idempotent:
+// running this against an already-clean blob is a no-op (no stray fields to strip, no
+// rewrite performed).
 export function loadPersistedApp(): Partial<AppState> | null {
   try {
     const stored = localStorage.getItem(APP_STORAGE_KEY)
     if (!stored) {
       return null
     }
-    return JSON.parse(stored) as Partial<AppState>
+    const parsed = JSON.parse(stored) as Partial<AppState>
+
+    if (Array.isArray(parsed.projects)) {
+      let changed = false
+      const cleanedProjects = parsed.projects.map((project: any) => {
+        if (
+          project &&
+          typeof project === 'object' &&
+          ('googleAccessToken' in project || 'googleUserEmail' in project)
+        ) {
+          changed = true
+          const { googleAccessToken: _googleAccessToken, googleUserEmail: _googleUserEmail, ...rest } = project
+          return rest
+        }
+        return project
+      })
+
+      if (changed) {
+        parsed.projects = cleanedProjects
+        try {
+          localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(parsed))
+        } catch (error) {
+          console.error('Failed to rewrite cleaned app state:', error)
+        }
+      }
+    }
+
+    return parsed
   } catch (error) {
     console.error('Failed to load persisted app state:', error)
     return null
+  }
+}
+
+/**
+ * Hydrate authByProject at boot from googleAuth.ts's cached-token state, so components
+ * render off state.authByProject without an async round-trip on first paint. Only the
+ * "authenticated" bit is available synchronously (the email is re-learned on the next
+ * connect/reauth); projects without a cached token get no entry, meaning disconnected.
+ */
+export function hydrateAuthByProject(projects: Project[]): AppState['authByProject'] {
+  const result: AppState['authByProject'] = {}
+  for (const project of projects) {
+    if (getAuthStatus(project.id).authenticated) {
+      result[project.id] = { email: '', needsReauth: false }
+    }
+  }
+  return result
+}
+
+/**
+ * Record a successful connection/reauth for a project in authByProject.
+ */
+export function setProjectGoogleAuth(
+  state: AppState,
+  projectId: string,
+  email: string
+): AppState {
+  return {
+    ...state,
+    authByProject: {
+      ...state.authByProject,
+      [projectId]: { email, needsReauth: false },
+    },
   }
 }
 
@@ -1151,13 +1221,11 @@ export function closeSettings(state: AppState): AppState {
  * Clear Google auth for the active project (token is removed in googleAuth.ts).
  */
 export function clearProjectGoogleAuth(state: AppState): AppState {
+  const authByProject = { ...state.authByProject }
+  delete authByProject[state.activeProjectId]
   return {
     ...state,
-    projects: state.projects.map(p =>
-      p.id === state.activeProjectId
-        ? { ...p, googleAccessToken: undefined, googleUserEmail: undefined }
-        : p
-    ),
+    authByProject,
     googleBusy: false,
     googleStatus: undefined,
   }

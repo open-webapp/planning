@@ -34,8 +34,6 @@ export interface Project {
   driveFileId: string | undefined
   lastSyncedSnapshot: string | null // JSON-serialized { tasks: Task[]; milestones: Milestone[] } as of last sync
   lastSyncedAt: string | null
-  googleAccessToken?: string // per-project OAuth token
-  googleUserEmail?: string // per-project user email
 }
 
 export interface SyncConflict {

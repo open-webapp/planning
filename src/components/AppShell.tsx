@@ -104,7 +104,7 @@ const AppShell: React.FC<AppShellProps> = ({
         <div className="flex-1" />
 
         {/* CloudSync icon */}
-        {activeProject?.googleAccessToken && activeProject?.driveFileId && (
+        {activeProject && state.authByProject[activeProject.id] && activeProject.driveFileId && (
           <button
             onClick={onSyncClick}
             title="Sync with sheet"

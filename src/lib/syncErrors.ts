@@ -10,7 +10,7 @@ export interface FriendlySyncError {
 
 /**
  * Extract the first balanced {...} object from a string, respecting quoted strings,
- * so trailing non-JSON text (e.g. our appended account diagnostic) doesn't break parsing.
+ * so trailing non-JSON text doesn't break parsing.
  */
 function extractFirstJsonObject(text: string): string | null {
   const start = text.indexOf('{')
@@ -47,14 +47,7 @@ function extractFirstJsonObject(text: string): string | null {
   return null
 }
 
-/** Extract the "(request was made as X)" account diagnostic we append in googleAuth.ts, if present. */
-function extractAccountDiagnostic(text: string): string | null {
-  const match = text.match(/\(request was made as ([^)]+)\)/)
-  return match ? match[1] : null
-}
-
 export function parseSyncError(rawError: string): FriendlySyncError {
-  const accountEmail = extractAccountDiagnostic(rawError)
   const jsonText = extractFirstJsonObject(rawError)
 
   if (jsonText) {
@@ -76,18 +69,19 @@ export function parseSyncError(rawError: string): FriendlySyncError {
       }
 
       if (apiError?.status === 'PERMISSION_DENIED') {
-        const base = apiError.message || 'Google denied access to this Drive file. Make sure it is still owned by the connected account.'
         return {
-          message: accountEmail ? `${base} (request used ${accountEmail} — check this matches the account the file was created with)` : base,
+          message:
+            apiError.message ||
+            'Google denied access to this Drive file. Make sure it is still owned by the connected account.',
         }
       }
 
       if (apiError?.status === 'NOT_FOUND') {
         // Google returns 404 (not 403) both when the ID is wrong AND when the file
         // exists but isn't accessible to the authenticated account — it hides which.
-        const base = "Drive file not found. Either it was deleted/moved outside the app, or it isn't accessible to the connected Google account."
         return {
-          message: accountEmail ? `${base} The request used ${accountEmail} — check this matches the account the file was created with (it may differ from what's shown in Settings if the token silently refreshed).` : base,
+          message:
+            "Drive file not found. Either it was deleted/moved outside the app, or it isn't accessible to the connected Google account.",
         }
       }
     } catch {

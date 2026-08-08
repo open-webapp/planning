@@ -1,5 +1,5 @@
-import { describe, test, expect } from 'vitest'
-import { openSettings, closeSettings } from '../lib/state'
+import { describe, test, expect, beforeEach } from 'vitest'
+import { openSettings, closeSettings, loadPersistedApp, APP_STORAGE_KEY } from '../lib/state'
 import { appReducer } from '../lib/reducer'
 import type { AppState } from '../lib/state'
 
@@ -15,12 +15,11 @@ const mockState: AppState = {
       driveFileId: undefined,
       lastSyncedSnapshot: null,
       lastSyncedAt: null,
-      googleAccessToken: undefined,
-      googleUserEmail: undefined,
     },
   ],
   savedProjects: {},
   googleBusy: false,
+  authByProject: {},
   settingsOpen: false,
   settingsTab: 'general',
   tasks: [],
@@ -89,5 +88,54 @@ describe('Settings functionality', () => {
   test('reducer should handle SET_SETTINGS_TAB action', () => {
     const result = appReducer(mockState, { type: 'SET_SETTINGS_TAB', tab: 'projects' })
     expect(result.settingsTab).toBe('projects')
+  })
+})
+
+describe('loadPersistedApp boot cleanup', () => {
+  beforeEach(() => {
+    const store: Record<string, string> = {}
+    ;(globalThis as any).localStorage = {
+      getItem: (k: string) => (k in store ? store[k] : null),
+      setItem: (k: string, v: string) => { store[k] = v },
+      removeItem: (k: string) => { delete store[k] },
+      clear: () => { Object.keys(store).forEach((k) => delete store[k]) },
+    }
+  })
+
+  test('strips googleAccessToken/googleUserEmail from old-shape persisted projects', () => {
+    const oldShapeBlob = {
+      activeView: 'tasks',
+      activeProjectId: 'p-1',
+      projects: [
+        {
+          id: 'p-1',
+          name: 'Legacy Project',
+          color: 'netskopeBlue',
+          driveFileId: undefined,
+          lastSyncedSnapshot: null,
+          lastSyncedAt: null,
+          googleAccessToken: 'stale-token',
+          googleUserEmail: 'stale@example.com',
+        },
+      ],
+      savedProjects: {},
+    }
+    ;(globalThis as any).localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(oldShapeBlob))
+
+    const loaded = loadPersistedApp()
+
+    expect(loaded?.projects?.[0]).not.toHaveProperty('googleAccessToken')
+    expect(loaded?.projects?.[0]).not.toHaveProperty('googleUserEmail')
+    expect(loaded?.projects?.[0]).toMatchObject({ id: 'p-1', name: 'Legacy Project' })
+
+    // The cleaned blob should have been rewritten to storage...
+    const rewritten = JSON.parse((globalThis as any).localStorage.getItem(APP_STORAGE_KEY))
+    expect(rewritten.projects[0]).not.toHaveProperty('googleAccessToken')
+    expect(rewritten.projects[0]).not.toHaveProperty('googleUserEmail')
+
+    // ...and running it again is a no-op (idempotent): no stale fields left to strip,
+    // and the second load matches the first exactly.
+    const loadedAgain = loadPersistedApp()
+    expect(loadedAgain).toEqual(loaded)
   })
 })

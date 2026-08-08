@@ -5,6 +5,7 @@ import {
   loadPersistedApp,
   savePersistedApp,
   deleteProjectWithBackup,
+  hydrateAuthByProject,
 } from './lib/state'
 import { appReducer } from './lib/reducer'
 import { seedData } from './lib/seed'
@@ -36,6 +37,7 @@ function initializeState(): AppState {
       activeProjectId: persisted.activeProjectId || '',
       projects: persisted.projects || [],
       savedProjects: persisted.savedProjects || {},
+      authByProject: hydrateAuthByProject(persisted.projects || []),
       googleBusy: false,
       syncBusy: false,
       syncConflicts: [],
@@ -60,23 +62,23 @@ function initializeState(): AppState {
   // Initialize with seed data
   const { tasks, milestones } = seedData()
   const projectId = 'p-default'
+  const projects = [
+    {
+      id: projectId,
+      name: 'Main Project',
+      color: 'netskopeBlue',
+      driveFileId: undefined,
+      lastSyncedSnapshot: null,
+      lastSyncedAt: null,
+    },
+  ]
 
   return {
     activeView: 'tasks',
     activeProjectId: projectId,
-    projects: [
-      {
-        id: projectId,
-        name: 'Main Project',
-        color: 'netskopeBlue',
-        driveFileId: undefined,
-        lastSyncedSnapshot: null,
-        lastSyncedAt: null,
-        googleAccessToken: undefined,
-        googleUserEmail: undefined,
-      },
-    ],
+    projects,
     savedProjects: {},
+    authByProject: hydrateAuthByProject(projects),
     googleBusy: false,
     syncBusy: false,
     syncConflicts: [],
@@ -204,19 +206,16 @@ function useAppDispatch(baseState: AppState, baseDispatch: React.Dispatch<Dispat
       })
     } else if (action.type === 'REVOKE_GOOGLE_TOKEN') {
       const projectId = stateRef.current.activeProjectId
-      const token = stateRef.current.projects.find(p => p.id === projectId)?.googleAccessToken
-      if (token) {
-        revokeToken(projectId)
-          .then(() => {
-            baseDispatch(action)
-          })
-          .catch((error) => {
-            console.error('Token revocation failed:', error)
-            baseDispatch(action)
-          })
-      } else {
-        baseDispatch(action)
-      }
+      // revokeToken() is safe to call unconditionally — it early-returns (after
+      // clearing any cached token) when there's nothing cached to revoke.
+      revokeToken(projectId)
+        .then(() => {
+          baseDispatch(action)
+        })
+        .catch((error) => {
+          console.error('Token revocation failed:', error)
+          baseDispatch(action)
+        })
     } else if (action.type === 'SYNC_RESOLVE_CONFLICTS') {
       const stateAtResolve = stateRef.current
       baseDispatch(action)

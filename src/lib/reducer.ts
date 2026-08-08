@@ -144,12 +144,7 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case 'SET_GOOGLE_TOKEN':
       return {
-        ...state,
-        projects: state.projects.map(p =>
-          p.id === state.activeProjectId
-            ? { ...p, googleAccessToken: action.token, googleUserEmail: action.email }
-            : p
-        ),
+        ...StateActions.setProjectGoogleAuth(state, state.activeProjectId, action.email),
         googleStatus: undefined,
         googleBusy: false,
       }

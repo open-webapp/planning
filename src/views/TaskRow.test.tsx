@@ -39,6 +39,7 @@ function makeMockState(overrides: Partial<AppState> = {}): AppState {
     ],
     savedProjects: {},
     googleBusy: false,
+    authByProject: {},
     settingsOpen: false,
     settingsTab: 'general',
     tasks: [makeTask({ id: 't1' })],

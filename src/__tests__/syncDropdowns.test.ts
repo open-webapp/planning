@@ -16,6 +16,7 @@ const mockState: AppState = {
   ],
   savedProjects: {},
   googleBusy: false,
+  authByProject: {},
   settingsOpen: false,
   settingsTab: 'general',
   tasks: [],

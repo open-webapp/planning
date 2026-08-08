@@ -52,17 +52,6 @@ describe('parseSyncError', () => {
     expect(result.actionUrl).toBeUndefined()
   })
 
-  it('surfaces the account diagnostic appended after the JSON body', () => {
-    const raw = `Push failed: Failed to fetch spreadsheet metadata: 404 - ${JSON.stringify({
-      error: { code: 404, message: 'Requested entity was not found.', status: 'NOT_FOUND' },
-    })} (request was made as someone@example.com)`
-
-    const result = parseSyncError(raw)
-
-    expect(result.message).toContain('Drive file not found')
-    expect(result.message).toContain('someone@example.com')
-  })
-
   it('returns the raw string unchanged when it is not JSON', () => {
     const result = parseSyncError('Sync cancelled: project switched')
     expect(result).toEqual({ message: 'Sync cancelled: project switched' })
