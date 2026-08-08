@@ -454,6 +454,18 @@ export function moveTaskToPosition(
   const task = state.tasks.find((t) => t.id === taskId)
   if (!task) return state
 
+  // Refuse moves that would make the task its own ancestor (directly, or by
+  // nesting it under one of its current descendants) — e.g. dragging a
+  // parent row onto one of its own children derives newParentId from the
+  // child's parentId, which is the dragged task's own id.
+  if (newParentId !== null) {
+    let current: Task | undefined = state.tasks.find((t) => t.id === newParentId)
+    while (current) {
+      if (current.id === taskId) return state
+      current = state.tasks.find((t) => t.id === current!.parentId)
+    }
+  }
+
   // 1. Enter manual mode + backfill the task's CURRENT group (pre-move),
   //    so its old siblings retain a coherent order after it leaves.
   let next = ensureManualModeForGroup(state, taskId, displaySchedules)

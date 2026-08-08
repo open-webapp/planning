@@ -159,6 +159,25 @@ describe('moveTaskToPosition', () => {
     expect(result).toBe(state)
   })
 
+  it('refuses to move a task to become its own parent', () => {
+    // t1 is parent of t2 (mirrors dragging a parent row onto its own child,
+    // where computeMoveTarget derives newParentId from the child's parentId,
+    // which is the dragged task's own id)
+    state.tasks[1].parentId = 't1'
+    const result = moveTaskToPosition(state, 't1', 'm1', 't1', undefined, undefined, {})
+    const movedTask = result.tasks.find((t) => t.id === 't1')
+    expect(movedTask!.parentId).not.toBe('t1')
+  })
+
+  it('refuses to move a task into its own descendant subtree', () => {
+    // t1 -> t2 -> t3 (t3 is a grandchild of t1); moving t1 under t3 would cycle
+    state.tasks[1].parentId = 't1'
+    state.tasks[2].parentId = 't2'
+    const result = moveTaskToPosition(state, 't1', 'm1', 't3', undefined, undefined, {})
+    const movedTask = result.tasks.find((t) => t.id === 't1')
+    expect(movedTask!.parentId).not.toBe('t3')
+  })
+
   it('handles subtree propagation with multiple levels', () => {
     const m2: Milestone = { id: 'm2', name: 'M2' }
     state.milestones.push(m2)
