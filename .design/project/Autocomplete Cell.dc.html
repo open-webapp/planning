@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<div style="{{ rootStyle }}" onClick="{{ stopClick }}">
+  <input ref="{{ inputRef }}" value="{{ query }}" onChange="{{ onInputChange }}" onFocus="{{ onFocus }}" onBlur="{{ onBlur }}" onKeyDown="{{ onKeyDown }}" placeholder="{{ placeholder }}" autoComplete="off" style="{{ inputStyle }}" style-hover="{{ hoverStyle }}" style-focus="{{ focusStyle }}"/>
+  <sc-if value="{{ menuVisible }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ menuStyle }}">
+      <sc-for list="{{ items }}" as="it" hint-placeholder-count="5">
+        <div onMouseDown="{{ it.onPick }}" style="{{ it.style }}">{{ it.label }}</div>
+      </sc-for>
+      <sc-if value="{{ showAddNew }}" hint-placeholder-val="{{ false }}">
+        <div onMouseDown="{{ onAddNew }}" style="{{ addNewStyle }}">{{ addNewLabel }}</div>
+      </sc-if>
+      <sc-if value="{{ showEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="{{ emptyStyle }}">No matches</div>
+      </sc-if>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { editing: false, query: '', open: false, highlight: -1, menuPos: null };
+  inputRef = React.createRef();
+
+  updateMenuPos() {
+    const el = this.inputRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    this.setState({ menuPos: { top: r.bottom + 2, left: r.left, width: Math.max(r.width, 160) } });
+  }
+
+  componentDidMount() {
+    this._onScroll = () => { if (this.state.open) this.updateMenuPos(); };
+    window.addEventListener('scroll', this._onScroll, true);
+    window.addEventListener('resize', this._onScroll);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('scroll', this._onScroll, true);
+    window.removeEventListener('resize', this._onScroll);
+  }
+
+  openMenu() {
+    this.updateMenuPos();
+    requestAnimationFrame(() => this.updateMenuPos());
+  }
+
+  commit(val) {
+    const trimmed = (val || '').trim();
+    this.setState({ editing: false, open: false, highlight: -1 });
+    if (trimmed && this.props.onCommit) this.props.onCommit(trimmed);
+  }
+
+  renderVals() {
+    const options = this.props.options || [];
+    const value = this.props.value || '';
+    const query = this.state.editing ? this.state.query : value;
+    const trimmedQuery = query.trim();
+    const ql = trimmedQuery.toLowerCase();
+    const filtered = (ql ? options.filter(o => o.toLowerCase().includes(ql)) : options).slice(0, 8);
+    const exactMatch = options.some(o => o.toLowerCase() === ql);
+    const showAddNew = this.state.open && !!trimmedQuery && !exactMatch;
+    const showEmpty = this.state.open && filtered.length === 0 && !showAddNew;
+    return {
+      query,
+      open: this.state.open,
+      placeholder: this.props.placeholder || '',
+      rootStyle: 'position:relative;' + (this.props.wrapperStyle || 'width:100%;'),
+      inputStyle: (this.props.inputStyle || 'width:100%;font-size:0.8125rem;') + 'outline:none;',
+      hoverStyle: this.props.inputHoverStyle || '',
+      focusStyle: this.props.inputFocusStyle || '',
+      inputRef: this.inputRef,
+      stopClick: (e) => { if (this.props.stopClick) this.props.stopClick(e); },
+      onFocus: (e) => { e.target.select(); this.setState({ editing: true, query: value, open: true, highlight: -1 }); this.openMenu(); },
+      onInputChange: (e) => { this.setState({ query: e.target.value, open: true, highlight: -1, editing: true }); this.openMenu(); },
+      onBlur: () => { if (this.state.editing) this.commit(this.state.query); },
+      onKeyDown: (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); this.commit(this.state.query); }
+        else if (e.key === 'Escape') { e.preventDefault(); this.setState({ editing: false, open: false, query: value }); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); this.setState(s => ({ highlight: Math.min((s.highlight ?? -1) + 1, filtered.length - 1), open: true, editing: true, query: s.editing ? s.query : value })); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState(s => ({ highlight: Math.max((s.highlight ?? -1) - 1, 0) })); }
+      },
+      menuVisible: this.state.open && !!this.state.menuPos,
+      menuStyle: this.state.menuPos ? ('position:fixed;top:' + this.state.menuPos.top + 'px;left:' + this.state.menuPos.left + 'px;width:' + this.state.menuPos.width + 'px;background:#fff;border:1px solid var(--ns-border);border-radius:var(--ns-r-md);box-shadow:var(--ns-shadow-2);z-index:9999;max-height:220px;overflow:auto;') : 'display:none;',
+      items: filtered.map((o, i) => ({
+        label: o,
+        style: 'padding:7px 12px;font-size:0.8125rem;cursor:pointer;color:var(--ns-fg-1);white-space:nowrap;' + (i === this.state.highlight ? 'background:var(--ns-ink-050);' : ''),
+        onPick: (e) => { e.preventDefault(); this.commit(o); }
+      })),
+      showAddNew,
+      addNewLabel: 'Add \u201c' + trimmedQuery + '\u201d',
+      addNewStyle: 'padding:7px 12px;font-size:0.8125rem;cursor:pointer;color:var(--ns-netskope-blue);border-top:1px solid var(--ns-divider);white-space:nowrap;',
+      onAddNew: (e) => { e.preventDefault(); this.commit(trimmedQuery); },
+      showEmpty,
+      emptyStyle: 'padding:7px 12px;font-size:0.8125rem;color:var(--ns-fg-3);'
+    };
+  }
+}
+</script>
+</body>
+</html>

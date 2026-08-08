@@ -1,0 +1,15 @@
+/* =============================================================
+   Netskope Design System — root stylesheet entry point
+   -------------------------------------------------------------
+   Consumers should link THIS file. It pulls in the canonical
+   design tokens + semantic type styles (colors_and_type.css).
+
+   Component/surface stylesheets are intentionally NOT imported
+   here, because they define scoped class names that would leak
+   if loaded globally:
+     • preview/preview.css      — Design System tab card styles
+     • slides/netskope-deck.css — deck-stage slide styles
+   Link those only on the pages that use them.
+   ============================================================= */
+
+@import url("./colors_and_type.css");

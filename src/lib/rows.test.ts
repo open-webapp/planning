@@ -300,4 +300,62 @@ describe('computeRowMap', () => {
     const visibleIds = visibleTaskRows.map((r) => r.id)
     expect(visibleIds).toEqual(['t1', 't2', 't3'])
   })
+
+  it('shows all 6 tasks with no milestones', () => {
+    const tasks = [
+      makeTask({ id: 't1', name: 'Unnamed1', milestoneId: null }),
+      makeTask({ id: 't2', name: 'Unnamed2', milestoneId: null }),
+      makeTask({ id: 't3', name: 'Unnamed3', milestoneId: null }),
+      makeTask({ id: 't4', name: 'Unnamed4', milestoneId: null }),
+      makeTask({ id: 't5', name: 'Unnamed5', milestoneId: null }),
+      makeTask({ id: 't6', name: 'Unnamed6', milestoneId: null }),
+    ]
+    const result = computeRowMap(tasks, [], {}, 'startDate', 'asc', {}, {})
+
+    expect(result.rowNumberMap['t1']).toBeDefined()
+    expect(result.rowNumberMap['t2']).toBeDefined()
+    expect(result.rowNumberMap['t3']).toBeDefined()
+    expect(result.rowNumberMap['t4']).toBeDefined()
+    expect(result.rowNumberMap['t5']).toBeDefined()
+    expect(result.rowNumberMap['t6']).toBeDefined()
+
+    const visibleTaskRows = result.visibleRows.filter((r) => r.type === 'task')
+    expect(visibleTaskRows).toHaveLength(6)
+  })
+
+  it('hides child tasks when parent is collapsed', () => {
+    const tasks = [
+      makeTask({ id: 't1', name: 'Parent1', parentId: null }),
+      makeTask({ id: 't2', name: 'Child1', parentId: 't1' }),
+      makeTask({ id: 't3', name: 'Child2', parentId: 't1' }),
+      makeTask({ id: 't4', name: 'Parent2', parentId: null }),
+      makeTask({ id: 't5', name: 'Child3', parentId: 't4' }),
+      makeTask({ id: 't6', name: 'Child4', parentId: 't4' }),
+    ]
+    // Collapse both parents
+    const expanded = { 't1': false, 't4': false }
+    const result = computeRowMap(tasks, [], expanded, 'startDate', 'asc', {}, {})
+
+    // Should show only the parents, not the children
+    const visibleTaskRows = result.visibleRows.filter((r) => r.type === 'task')
+    expect(visibleTaskRows).toHaveLength(2)
+    expect(visibleTaskRows.map((r) => r.id)).toEqual(['t1', 't4'])
+  })
+
+  it('shows all 6 flat tasks without sortKey (sortKey is falsy)', () => {
+    const tasks = [
+      makeTask({ id: 't1', name: 'Unnamed1', milestoneId: null, parentId: null }),
+      makeTask({ id: 't2', name: 'Unnamed2', milestoneId: null, parentId: null }),
+      makeTask({ id: 't3', name: 'Unnamed3', milestoneId: null, parentId: null }),
+      makeTask({ id: 't4', name: 'Unnamed4', milestoneId: null, parentId: null }),
+      makeTask({ id: 't5', name: 'Unnamed5', milestoneId: null, parentId: null }),
+      makeTask({ id: 't6', name: 'Unnamed6', milestoneId: null, parentId: null }),
+    ]
+    // Test with empty sortKey
+    const result = computeRowMap(tasks, [], {}, '', 'asc', {}, {})
+
+    const visibleTaskRows = result.visibleRows.filter((r) => r.type === 'task')
+    expect(visibleTaskRows).toHaveLength(6)
+    expect(visibleTaskRows.map((r) => r.id)).toEqual(['t1', 't2', 't3', 't4', 't5', 't6'])
+  })
 })

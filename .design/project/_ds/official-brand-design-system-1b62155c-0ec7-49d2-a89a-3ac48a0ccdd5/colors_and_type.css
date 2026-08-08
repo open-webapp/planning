@@ -1,0 +1,290 @@
+/* =============================================================
+   Netskope Design System — Colors & Type
+   Source of truth: 2025-07 Netskope Brand Guidelines (Abridged) +
+   2026-01 Confidential Slide Template (theme1.xml).
+   Per the guidelines:
+     - Primary type: Inter. Secondary type: Lora (serif accent).
+     - Color is named (Light Blue, Netskope Blue, Deep Blue, Teal,
+       Lightning Green, Mono White, Netskope Gray, Netskope Orange).
+       Hex values reconciled from the official PPTX theme.
+     - Four named gradients only: Iced Blue, Confident Blue,
+       Confident Green, Neon Green.
+   ============================================================= */
+
+/* -------- LOCAL FONTS -------- */
+@font-face {
+  font-family: "Inter";
+  src: url("./assets/fonts/Inter-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("./assets/fonts/Inter-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("./assets/fonts/Inter-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Lora";
+  src: url("./assets/fonts/Lora-Variable.ttf") format("truetype-variations");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Lora";
+  src: url("./assets/fonts/Lora-Italic-Variable.ttf") format("truetype-variations");
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  /* =====================================================
+     PRIMARY COLORS
+     ===================================================== */
+  /* Light Blue — pale tint, soft surface */
+  --ns-light-blue:        #D9FAFF;
+  /* Netskope Blue — the "active" mid blue used in highlights & accents (was accent1 in theme) */
+  --ns-netskope-blue:     #00A9CE;
+  /* Deep Blue — the dominant brand navy, dk1/dk2 */
+  --ns-deep-blue:         #081A59;
+
+  /* =====================================================
+     SECONDARY COLORS
+     ===================================================== */
+  --ns-teal:              #008C95;
+  --ns-lightning-green:   #AFF097;
+  /* Orange is in the secondary palette but ACCENT ONLY */
+  --ns-orange:            #FF8200;
+
+  /* =====================================================
+     NEUTRAL PALETTE
+     ===================================================== */
+  --ns-mono-white:        #FFFFFF;
+  --ns-netskope-gray:     #53565A;  /* neutral brand gray */
+
+  /* Working neutral scale (UI text, dividers, surfaces) — derived from
+     Netskope Gray #53565A. Use these for product UI. */
+  --ns-ink-900: #1A1C1E;
+  --ns-ink-800: #26282B;
+  --ns-ink-700: #373A3E;
+  --ns-ink-600: #46494E;
+  --ns-ink-500: #53565A;  /* = Netskope Gray */
+  --ns-ink-400: #737982;
+  --ns-ink-300: #A9ADB2;
+  --ns-ink-200: #D9DBDD;
+  --ns-ink-100: #EFF0F1;
+  --ns-ink-050: #F8F9F9;
+
+  /* =====================================================
+     SEMANTIC SURFACES
+     ===================================================== */
+  --ns-bg:            var(--ns-mono-white);
+  --ns-bg-alt:        var(--ns-ink-050);
+  --ns-bg-tint:       #D9FAFF;          /* very pale ice — "light blue surface" */
+  --ns-bg-inverse:    var(--ns-deep-blue);
+
+  --ns-fg-1:          var(--ns-ink-900);
+  --ns-fg-2:          var(--ns-ink-500);
+  --ns-fg-3:          var(--ns-ink-400);
+  --ns-fg-on-dark-1:  var(--ns-mono-white);
+  --ns-fg-on-dark-2:  var(--ns-light-blue);
+
+  --ns-border:        var(--ns-ink-200);
+  --ns-border-strong: var(--ns-ink-300);
+  --ns-divider:       var(--ns-ink-100);
+
+  /* Links: brand uses cyan/Netskope Blue */
+  --ns-link:          var(--ns-netskope-blue);
+  --ns-link-hover:    #02B6D5;
+
+  /* =====================================================
+     STATE COLORS  (for product UI; not brand-canonical)
+     ===================================================== */
+  --ns-success: #2BAE66;
+  --ns-warning: var(--ns-orange);
+  --ns-danger:  #D6336C;
+  --ns-info:    var(--ns-netskope-blue);
+
+  /* =====================================================
+     OFFICIAL GRADIENTS — four, named, do not modify
+     Each is "color A" → "color B" with a halo position you may move.
+     Per spec: keep the halo epicenter OFF-FRAME — never a hot spot in the middle.
+     ===================================================== */
+
+  /* 1. Iced Blue — Netskope Blue + Light Blue. Best legibility: Deep Blue copy. */
+  --ns-grad-iced-blue:
+    radial-gradient(ellipse 80% 115% at 110% 50%,
+      #00A9CE 0%, #46C6E0 14%, #86DBEC 28%, #BDEEF7 46%, #D9FAFF 68%, #E6FCFF 100%); /* @kind color */
+
+  /* 2. Confident Blue — Netskope Blue + Deep Blue. Best legibility: Mono White copy. */
+  --ns-grad-confident-blue:
+    radial-gradient(ellipse 70% 100% at 100% 50%,
+      #00A9CE 0%, #0A6FA0 30%, #08326F 60%, #081A59 100%); /* @kind color */
+
+  /* 3. Confident Green — Teal + Lightning Green. Mono White or Netskope Gray copy. */
+  --ns-grad-confident-green:
+    radial-gradient(ellipse 70% 100% at 100% 50%,
+      #AFF097 0%, #6FC79A 35%, #008C95 100%); /* @kind color */
+
+  /* 4. Neon Green — Netskope Blue + Lightning Green (reversible). Mono White or Netskope Gray copy. */
+  --ns-grad-neon-green:
+    radial-gradient(ellipse 70% 100% at 100% 50%,
+      #AFF097 0%, #6FD3C0 40%, #00A9CE 100%); /* @kind color */
+
+  /* =====================================================
+     TYPOGRAPHY
+     Primary: Inter (Regular / Medium / SemiBold). Per spec, NEVER use
+       Inter Bold/ExtraBold/Super for headlines.
+     Secondary: Lora (Regular / Medium / SemiBold). Per spec, NEVER use
+       Lora Bold or italics for headlines.
+     Pairing rule: when paired, both fonts must use the SAME size + weight.
+     ===================================================== */
+  --ns-font-sans:    "Inter", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  --ns-font-serif:   "Lora", Georgia, "Times New Roman", serif;
+  --ns-font-mono:    "SF Mono", ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
+
+  --ns-fw-regular: 400;  /* @kind font */
+  --ns-fw-medium:  500;  /* @kind font */
+  --ns-fw-semibold:600;  /* @kind font */
+  /* No bold/extrabold tokens — Brand Guidelines forbid them for display. */
+
+  /* Type scale (rem-based, 1rem = 16px) */
+  --ns-fs-display-xl: 4.5rem;
+  --ns-fs-display-lg: 3.5rem;
+  --ns-fs-display-md: 2.75rem;
+  --ns-fs-h1:         2.25rem;
+  --ns-fs-h2:         1.75rem;
+  --ns-fs-h3:         1.375rem;
+  --ns-fs-h4:         1.125rem;
+  --ns-fs-body-lg:    1.125rem;
+  --ns-fs-body:       1rem;
+  --ns-fs-body-sm:    0.875rem;
+  --ns-fs-eyebrow:    0.75rem;
+  --ns-fs-caption:    0.75rem;
+
+  --ns-lh-tight:   1.1;   /* @kind font */
+  --ns-lh-display: 1.05;  /* @kind font */
+  --ns-lh-snug:    1.25;  /* @kind font */
+  --ns-lh-normal:  1.5;   /* @kind font */
+  --ns-lh-relaxed: 1.65;  /* @kind font */
+
+  --ns-tracking-display: -0.01em;   /* @kind font */
+  --ns-tracking-tight:   -0.005em;  /* @kind font */
+  --ns-tracking-normal:  0;          /* @kind font */
+  --ns-tracking-eyebrow: 0.14em;     /* @kind font */
+
+  /* =====================================================
+     SPACING (4px base)
+     ===================================================== */
+  --ns-s-1: 4px;
+  --ns-s-2: 8px;
+  --ns-s-3: 12px;
+  --ns-s-4: 16px;
+  --ns-s-5: 24px;
+  --ns-s-6: 32px;
+  --ns-s-7: 48px;
+  --ns-s-8: 64px;
+  --ns-s-9: 96px;
+
+  /* =====================================================
+     RADIUS
+     Brand uses rounded rectangles. Photography: 45px corner radius (per Hero Combo spec).
+     ===================================================== */
+  --ns-r-sm:    4px;
+  --ns-r-md:    8px;
+  --ns-r-lg:    12px;
+  --ns-r-xl:    20px;
+  --ns-r-photo: 45px;   /* official rounded-rectangle radius for image frames */
+  --ns-r-pill:  999px;
+
+  /* =====================================================
+     SHADOWS — navy-tinted, never neutral grey
+     ===================================================== */
+  --ns-shadow-1: 0 1px 2px rgba(8,26,89,0.06), 0 1px 1px rgba(8,26,89,0.04);
+  --ns-shadow-2: 0 4px 12px rgba(8,26,89,0.08), 0 2px 4px rgba(8,26,89,0.04);
+  --ns-shadow-3: 0 12px 32px rgba(8,26,89,0.12), 0 4px 8px rgba(8,26,89,0.06);
+  --ns-shadow-glow-cyan: 0 0 0 1px rgba(0,169,206,0.4), 0 8px 28px rgba(0,169,206,0.25);
+
+  /* =====================================================
+     MOTION
+     ===================================================== */
+  --ns-ease-standard:   cubic-bezier(0.2, 0, 0, 1);    /* @kind other */
+  --ns-ease-emphasized: cubic-bezier(0.2, 0, 0, 1.2);  /* @kind other */
+  --ns-dur-fast:  120ms;  /* @kind other */
+  --ns-dur-base:  200ms;  /* @kind other */
+  --ns-dur-slow:  320ms;  /* @kind other */
+
+  /* =====================================================
+     LOGO MINIMUMS (per spec)
+     ===================================================== */
+  --ns-logo-min-digital: 90px;   /* @kind spacing */  /* min icon-mark width on screen */
+  /* Print min: 1.25in */
+}
+
+/* =============================================================
+   Semantic typographic styles
+   ============================================================= */
+
+.ns-eyebrow {
+  font-family: var(--ns-font-sans);
+  font-size: var(--ns-fs-eyebrow);
+  font-weight: var(--ns-fw-semibold);
+  letter-spacing: var(--ns-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ns-teal);
+}
+
+.ns-display-xl, .ns-display-lg, .ns-display-md {
+  font-family: var(--ns-font-sans);
+  /* Per spec: Inter Regular is the GO-TO weight even for display. SemiBold for emphasis only. */
+  font-weight: var(--ns-fw-regular);
+  line-height: var(--ns-lh-display);
+  letter-spacing: var(--ns-tracking-display);
+  color: var(--ns-fg-1);
+}
+.ns-display-xl { font-size: var(--ns-fs-display-xl); }
+.ns-display-lg { font-size: var(--ns-fs-display-lg); }
+.ns-display-md { font-size: var(--ns-fs-display-md); }
+
+.ns-h1, .ns-h2, .ns-h3, .ns-h4 {
+  font-family: var(--ns-font-sans);
+  font-weight: var(--ns-fw-regular);  /* Inter Regular per spec */
+  color: var(--ns-fg-1);
+  line-height: var(--ns-lh-tight);
+  letter-spacing: var(--ns-tracking-tight);
+}
+.ns-h1 { font-size: var(--ns-fs-h1); }
+.ns-h2 { font-size: var(--ns-fs-h2); }
+.ns-h3 { font-size: var(--ns-fs-h3); font-weight: var(--ns-fw-medium); }
+.ns-h4 { font-size: var(--ns-fs-h4); font-weight: var(--ns-fw-medium); line-height: var(--ns-lh-snug); }
+
+/* Lora — serif accent. Use ONLY when paired 50/50 with Inter at same size+weight,
+   on titles ≤ 5 words across 2 lines. */
+.ns-serif {
+  font-family: var(--ns-font-serif);
+  font-weight: var(--ns-fw-regular);
+  font-style: normal;       /* italics forbidden in headlines */
+  letter-spacing: 0;
+}
+
+.ns-body-lg { font: var(--ns-fw-regular) var(--ns-fs-body-lg)/var(--ns-lh-relaxed) var(--ns-font-sans); color: var(--ns-fg-1); }
+.ns-body    { font: var(--ns-fw-regular) var(--ns-fs-body)/var(--ns-lh-normal) var(--ns-font-sans);    color: var(--ns-fg-1); }
+.ns-body-sm { font: var(--ns-fw-regular) var(--ns-fs-body-sm)/var(--ns-lh-normal) var(--ns-font-sans); color: var(--ns-fg-2); }
+.ns-caption { font: var(--ns-fw-medium)  var(--ns-fs-caption)/var(--ns-lh-snug) var(--ns-font-sans);   color: var(--ns-fg-3); }
+.ns-mono    { font-family: var(--ns-font-mono); font-size: var(--ns-fs-body-sm); }
+
+/* Color helpers */
+.ns-accent-orange { color: var(--ns-orange); }
+.ns-accent-cyan   { color: var(--ns-netskope-blue); }
+.ns-accent-teal   { color: var(--ns-teal); }

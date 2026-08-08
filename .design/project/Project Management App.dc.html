@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/official-brand-design-system-1b62155c-0ec7-49d2-a89a-3ac48a0ccdd5/colors_and_type.css">
+  <link rel="stylesheet" href="_ds/official-brand-design-system-1b62155c-0ec7-49d2-a89a-3ac48a0ccdd5/styles.css">
+  <script src="_ds/official-brand-design-system-1b62155c-0ec7-49d2-a89a-3ac48a0ccdd5/_ds_bundle.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    body{margin:0;background:var(--ns-bg);}
+    a{color:var(--ns-link);}
+    a:hover{color:var(--ns-link-hover);}
+    select,input,textarea,button{font-family:var(--ns-font-sans);}
+    ::-webkit-scrollbar{width:8px;height:8px;}
+    ::-webkit-scrollbar-thumb{background:var(--ns-ink-200);border-radius:8px;}
+  </style>
+</helmet>
+<div onClick="{{ closeProjectMenu }}" style="display:flex;height:100vh;width:100vw;overflow:hidden;font-family:var(--ns-font-sans);background:var(--ns-bg);color:var(--ns-fg-1);position:relative;">
+
+  <div style="display:flex;flex-direction:column;flex:1;min-width:0;height:100vh;">
+    <div style="display:flex;align-items:center;gap:24px;padding:0 28px;border-bottom:1px solid var(--ns-border);background:var(--ns-deep-blue);flex-shrink:0;">
+      <div style="position:relative;padding:14px 0;">
+        <div onClick="{{ toggleProjectMenu }}" style="cursor:pointer;">
+          <div style="display:flex;align-items:center;gap:6px;margin-top:1px;">
+            <span style="font-size:1rem;color:#fff;font-weight:500;">{{ activeProjectName }}</span>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          </div>
+        </div>
+        <sc-if value="{{ projectMenuOpen }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ stopClick }}" style="position:absolute;top:100%;left:0;margin-top:8px;background:#fff;border:1px solid var(--ns-border);border-radius:var(--ns-r-md);box-shadow:var(--ns-shadow-2);min-width:240px;z-index:20;overflow:hidden;">
+            <sc-for list="{{ projectMenuItems }}" as="p" hint-placeholder-count="3">
+              <div onClick="{{ p.select }}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;cursor:pointer;" style-hover="background:var(--ns-ink-050);">
+                <span style="font-size:0.875rem;color:{{ p.textColor }};font-weight:{{ p.fontWeight }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.name }}</span>
+                <sc-if value="{{ p.isActive }}" hint-placeholder-val="{{ false }}">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--ns-netskope-blue)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+                </sc-if>
+              </div>
+            </sc-for>
+            <div onClick="{{ onCreateProject }}" style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;border-top:1px solid var(--ns-border);color:var(--ns-netskope-blue);" style-hover="background:var(--ns-ink-050);">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+              <span style="font-size:0.875rem;font-weight:500;">New Project</span>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      <div style="display:flex;align-items:stretch;gap:4px;margin-left:12px;">
+        <div onClick="{{ goDashboard }}" style="{{ dashboardNavStyle }}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>
+          <span>Dashboard</span>
+        </div>
+        <div onClick="{{ goTasks }}" style="{{ tasksNavStyle }}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11"></path><path d="M9 12h11"></path><path d="M9 18h11"></path><path d="M4 6l1.4 1.4L8 4.8"></path><path d="M4 12l1.4 1.4L8 10.8"></path><path d="M4 18l1.4 1.4L8 16.8"></path></svg>
+          <span>Tasks</span>
+        </div>
+        <div onClick="{{ goTimeline }}" style="{{ timelineNavStyle }}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="12" width="3" height="8"></rect><rect x="10.5" y="6" width="3" height="14"></rect><rect x="17" y="9" width="3" height="11"></rect></svg>
+          <span>Timeline</span>
+        </div>
+      </div>
+      <div style="flex:1;"></div>
+      <sc-if value="{{ canSync }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ onSyncClick }}" title="{{ syncTitle }}" style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:var(--ns-r-md);cursor:pointer;color:rgba(255,255,255,0.75);flex-shrink:0;" style-hover="background:rgba(255,255,255,0.12);color:#fff;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"></path><path d="M8 21v-5h-5"></path></svg>
+        </div>
+      </sc-if>
+      <div onClick="{{ onExportCsv }}" title="Download tasks as CSV" style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:var(--ns-r-md);cursor:pointer;color:rgba(255,255,255,0.75);flex-shrink:0;" style-hover="background:rgba(255,255,255,0.12);color:#fff;">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+      </div>
+      <div onClick="{{ openSettings }}" title="Settings" style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:var(--ns-r-md);cursor:pointer;color:rgba(255,255,255,0.75);flex-shrink:0;" style-hover="background:rgba(255,255,255,0.12);color:#fff;">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </div>
+    </div>
+    <sc-if value="{{ showToolbar }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 28px;border-bottom:1px solid var(--ns-border);background:#fff;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:8px;border:1px solid var(--ns-border);border-radius:var(--ns-r-md);padding:7px 10px;flex:1;max-width:280px;">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ns-fg-3)" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+        <input value="{{ searchValue }}" onChange="{{ onSearchChange }}" placeholder="Search tasks…" style="border:none;outline:none;font-size:0.875rem;flex:1;min-width:0;color:var(--ns-fg-1);"/>
+      </div>
+      <sc-if value="{{ showFilters }}" hint-placeholder-val="{{ true }}">
+        <select value="{{ statusFilterValue }}" onChange="{{ onStatusFilterChange }}" style="padding:7px 8px;border:1px solid var(--ns-border);border-radius:var(--ns-r-md);font-size:0.8125rem;color:var(--ns-fg-2);">
+          <sc-for list="{{ statusFilterOptions }}" as="opt" hint-placeholder-count="5">
+            <option value="{{ opt }}">{{ opt }}</option>
+          </sc-for>
+        </select>
+        <select value="{{ categoryFilterValue }}" onChange="{{ onCategoryFilterChange }}" style="padding:7px 8px;border:1px solid var(--ns-border);border-radius:var(--ns-r-md);font-size:0.8125rem;color:var(--ns-fg-2);">
+          <sc-for list="{{ categoryFilterOptions }}" as="opt" hint-placeholder-count="6">
+            <option value="{{ opt }}">{{ opt }}</option>
+          </sc-for>
+        </select>
+        <select value="{{ assigneeFilterValue }}" onChange="{{ onAssigneeFilterChange }}" style="padding:7px 8px;border:1px solid var(--ns-border);border-radius:var(--ns-r-md);font-size:0.8125rem;color:var(--ns-fg-2);">
+          <sc-for list="{{ assigneeFilterOptions }}" as="opt" hint-placeholder-count="7">
+            <option value="{{ opt }}">{{ opt }}</option>
+          </sc-for>
+        </select>
+        <select value="{{ milestoneFilterValue }}" onChange="{{ onMilestoneFilterChange }}" style="padding:7px 8px;border:1px solid var(--ns-border);border-radius:var(--ns-r-md);font-size:0.8125rem;color:var(--ns-fg-2);">
+          <sc-for list="{{ milestoneFilterOptions }}" as="opt" hint-placeholder-count="4">
+            <option value="{{ opt.id }}">{{ opt.name }}</option>
+          </sc-for>
+        </select>
+      </sc-if>
+      <div style="flex:1;"></div>
+      <sc-if value="{{ showAddTaskButton }}" hint-placeholder-val="{{ true }}">
+      <button onClick="{{ onAddTask }}" style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--ns-deep-blue);color:#fff;border:none;border-radius:var(--ns-r-md);font-size:0.8125rem;cursor:pointer;white-space:nowrap;">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+        New Task
+      </button>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <div style="flex:1;overflow:auto;padding:28px 32px;">
+
+      <sc-if value="{{ activeViewIsDashboard }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <h2 style="margin:0 0 20px;font-size:1.75rem;font-weight:400;color:var(--ns-fg-1);">Dashboard</h2>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:24px;">
+            <sc-for list="{{ statCards }}" as="card" hint-placeholder-count="4">
+              <div style="background:#fff;border:1px solid var(--ns-border);border-radius:var(--ns-r-lg);padding:20px;box-shadow:var(--ns-shadow-1);">
+                <div style="font-size:0.75rem;color:var(--ns-fg-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">{{ card.label }}</div>
+                <div style="font-size:1.75rem;font-weight:500;color:{{ card.accent }}">{{ card.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:20px;margin-bottom:24px;">
+            <div style="background:#fff;border:1px solid var(--ns-border);border-radius:var(--ns-r-lg);padding:24px;box-shadow:var(--ns-shadow-1);">
+              <div style="font-size:1rem;font-weight:500;margin-bottom:16px;">Status breakdown</div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <sc-for list="{{ statusBreakdown }}" as="b" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="{{ b.dotStyle }}"></span>
+                    <span style="width:100px;font-size:0.8125rem;color:var(--ns-fg-2);flex-shrink:0;">{{ b.status }}</span>
+                    <div style="flex:1;height:8px;background:var(--ns-ink-100);border-radius:999px;overflow:hidden;"><div style="{{ b.barStyle }}"></div></div>
+                    <span style="width:28px;text-align:right;font-size:0.8125rem;color:var(--ns-fg-3);">{{ b.count }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:#fff;border:1px solid var(--ns-border);border-radius:var(--ns-r-lg);padding:24px;box-shadow:var(--ns-shadow-1);">
+              <div style="font-size:1rem;font-weight:500;margin-bottom:16px;">Upcoming milestones</div>
+              <div style="display:flex;flex-direction:column;gap:14px;">
+                <sc-for list="{{ upcomingMilestones }}" as="m" hint-placeholder-count="3">
+                  <div onClick="{{ m.select }}" style="cursor:pointer;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                      <span style="font-size:0.875rem;color:var(--ns-fg-1);">{{ m.name }}</span>
+                      <span style="font-size:0.75rem;color:var(--ns-fg-3);">{{ m.endLabel }}</span>
+                    </div>
+                    <div style="height:6px;background:var(--ns-ink-100);border-radius:999px;overflow:hidden;"><div style="{{ m.progressStyle }}"></div></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid var(--ns-border);border-radius:var(--ns-r-lg);padding:24px;box-shadow:var(--ns-shadow-1);">
+            <div style="font-size:1rem;font-weight:500;margin-bottom:16px;">Recent activity</div>
+            <div style="display:flex;flex-direction:column;gap:14px;">
+              <sc-for list="{{ activityFeed }}" as="a" hint-placeholder-count="5">
+                <div onClick="{{ a.select }}" style="cursor:pointer;border-bottom:1px solid var(--ns-divider);padding-bottom:12px;">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                    <span style="font-size:0.8125rem;font-weight:500;color:var(--ns-fg-1);">{{ a.author }} on {{ a.taskName }}</span>
+                    <span style="font-size:0.75rem;color:var(--ns-fg-3);white-space:nowrap;">{{ a.tsLabel }}</span>
+                  </div>
+                  <div style="font-size:0.8125rem;color:var(--ns-fg-2);">{{ a.text }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ activeViewIsTasks }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h2 style="margin:0 0 16px;font-size:1.75rem;font-weight:400;color:var(--ns-fg-1);">Tasks <span style="font-size:0.875rem;color:var(--ns-fg-3);font-weight:400;">({{ tasksVisibleCount }} shown)</span></h2>
+          <div style="background:#fff;border:1px solid var(--ns-border);border-radius:var(--ns-r-lg);overflow-x:auto;">
+              <div style="{{ tasksHeaderRowStyle }}">
+                <sc-for list="{{ headerColumns }}" as="col" hint-placeholder-count="10">
+                  <div style="position:relative;display:flex;align-items:center;gap:4px;cursor:{{ col.cursor }};user-select:none;" onClick="{{ col.onClick }}">
+                    <span>{{ col.label }}</span>
+                    <sc-if value="{{ col.sorted }}" hint-placeholder-val="{{ false }}"><span style="color:var(--ns-netskope-blue);">{{ col.arrow }}</span></sc-if>
+                    <sc-if value="{{ col.resizable }}" hint-placeholder-val="{{ true }}">
+                      <div onMouseDown="{{ col.onResizeStart }}" style="position:absolute;top:-10px;bottom:-10px;right:-6px;width:10px;cursor:col-resize;z-index:1;"></div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+              <sc-for list="{{ rows }}" as="row" hint-placeholder-count="10">
+                <div>
+                  <sc-if value="{{ row.isMilestoneRow }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--ns-ink-050);border-bottom:1px solid var(--ns-divider);min-width:{{ tasksTableMinWidth }};">
+                      <input value="{{ row.name }}" onChange="{{ row.onNameChange }}" onKeyDown="{{ row.onNameKeyDown }}" style="font-size:0.9375rem;font-weight:500;color:var(--ns-deep-blue);border:1px solid transparent;background:transparent;padding:3px 5px;margin:-3px -5px;border-radius:4px;font-family:inherit;box-sizing:border-box;width:320px;" style-hover="background:rgba(255,255,255,0.6);" style-focus="border:1px solid var(--ns-netskope-blue);background:#fff;"/>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ row.isTaskRow }}" hint-placeholder-val="{{ false }}">
+                    <div style="{{ row.rowStyle }}">
+                      <span style="font-size:0.8125rem;color:var(--ns-fg-3);">{{ row.number }}</span>
+                      <div style="{{ row.indentStyle }}; display:flex;align-items:center;gap:6px;min-width:0;">
+                        <sc-if value="{{ row.hasChildren }}" hint-placeholder-val="{{ false }}">
+                          <span onClick="{{ row.toggleExpand }}" style="display:flex;color:var(--ns-fg-3);cursor:pointer;flex-shrink:0;">
+                            <sc-if value="{{ row.expanded }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></sc-if>
+                            <sc-if value="{{ row.collapsed }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></sc-if>
+                          </span>
+                        </sc-if>
+                        <sc-if value="{{ row.isCritical }}" hint-placeholder-val="{{ false }}">
+                          <span title="On critical path" style="width:7px;height:7px;border-radius:50%;background:var(--ns-orange);flex-shrink:0;"></span>
+                        </sc-if>
+                        <input data-task-id="{{ row.id }}" value="{{ row.name }}" onChange="{{ row.onNameChange }}" onClick="{{ row.stop }}" onKeyDown="{{ row.onNameKeyDown }}" style="flex:1;min-width:0;border:1px solid transparent;background:transparent;font-size:0.875rem;color:var(--ns-fg-1);padding:2px 4px;margin:-2px 0 -2px -4px;border-radius:4px;font-family:inherit;box-sizing:border-box;" style-hover="background:var(--ns-ink-050);" style-focus="border:1px solid var(--ns-netskope-blue);background:#fff;"/>
+                        <span onClick="{{ row.onDetailsClick }}" title="{{ row.detailsTitle }}" style="display:flex;align-items:center;gap:3px;flex-shrink:0;cursor:pointer;padding:3px 6px;border-radius:999px;color:{{ row.detailsColor }};background:{{ row.detailsBg }};border:1px solid {{ row.detailsBorder }};white-space:nowrap;" style-hover="background:var(--ns-ink-100);">
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                          <span style="font-size:0.6875rem;font-weight:500;">Details</span>
+                          <sc-if value="{{ row.hasComments }}" hint-placeholder-val="{{ false }}"><span style="font-size:0.6875rem;font-weight:600;">({{ row.commentCount }})</span></sc-if>
+                        </span>
+                      </div>
+                      <div style="display:flex;flex-direction:column;min-width:0;overflow:hidden;">
+                        <dc-import name="Autocomplete Cell" value="{{ row.category }}" options="{{ categoryOptionsList }}" on-commit="{{ row.onCategoryCommit }}" stop-click="{{ row.stop }}" placeholder="Category" wrapper-style="width:100%;" input-style="width:100%;max-width:100%;box-sizing:border-box;font-size:0.8125rem;color:var(--ns-fg-2);border:1px solid transparent;background:transparent;border-radius:4px;padding:2px;margin:-2px -2px 0;font-family:inherit;" input-hover-style="background:var(--ns-ink-050);" input-focus-style="border:1px solid var(--ns-netskope-blue);background:#fff;" hint-size="100%,24px"></dc-import>
+                      </div>
+                      <dc-import name="Autocomplete Cell" value="{{ row.status }}" options="{{ statusOptionsList }}" on-commit="{{ row.onStatusCommit }}" stop-click="{{ row.stop }}" placeholder="Status" wrapper-style="justify-self:start;" input-style="{{ row.statusBadgeStyle }}; border:1px solid transparent;min-width:96px;" input-hover-style="filter:brightness(0.97);" input-focus-style="box-shadow:0 0 0 2px color-mix(in srgb, var(--ns-netskope-blue) 40%, transparent);" hint-size="140px,26px"></dc-import>
+                      <dc-import name="Autocomplete Cell" value="{{ row.assignee }}" options="{{ assigneeOptionsList }}" on-commit="{{ row.onAssigneeCommit }}" stop-click="{{ row.stop }}" placeholder="Assignee" wrapper-style="width:100%;" input-style="font-size:0.8125rem;color:var(--ns-fg-2);border:1px solid transparent;background:transparent;border-radius:4px;padding:2px 4px;margin:-2px -4px;font-family:inherit;width:100%;box-sizing:border-box;" input-hover-style="background:var(--ns-ink-050);" input-focus-style="border:1px solid var(--ns-netskope-blue);background:#fff;" hint-size="100%,24px"></dc-import>
+                      <input type="date" value="{{ row.startDateRaw }}" onChange="{{ row.onStartDateChange }}" onClick="{{ row.stop }}" style="font-size:0.8125rem;color:var(--ns-fg-2);border:1px solid transparent;background:transparent;border-radius:4px;padding:2px;margin:-2px;font-family:inherit;width:100%;box-sizing:border-box;" style-hover="background:var(--ns-ink-050);" style-focus="border:1px solid var(--ns-netskope-blue);background:#fff;"/>
+                      <input type="number" min="0" value="{{ row.estimate }}" onChange="{{ row.onEstimateChange }}" onClick="{{ row.stop }}" style="width:100%;font-size:0.8125rem;color:var(--ns-fg-2);border:1px solid transparent;background:transparent;border-radius:4px;padding:2px 4px;margin:-2px -4px;font-family:inherit;box-sizing:border-box;" style-hover="background:var(--ns-ink-050);" style-focus="border:1px solid var(--ns-netskope-blue);background:#fff;"/>
+                      <span style="font-size:0.8125rem;color:var(--ns-fg-2);">{{ row.endLabel }}</span>
+                      <span onClick="{{ row.onDepsCellClick }}" style="font-size:0.8125rem;color:var(--ns-fg-2);border:1px solid transparent;background:transparent;border-radius:4px;padding:2px 4px;margin:-2px -4px;width:100%;box-sizing:border-box;cursor:pointer;display:block;" style-hover="background:var(--ns-ink-050);">{{ row.depsDisplay }}</span>
+                      <div style="display:flex;align-items:center;gap:2px;">
+                        <sc-if value="{{ row.isLeaf }}" hint-placeholder-val="{{ true }}">
+                          <input type="number" min="0" max="100" value="{{ row.progress }}" onChange="{{ row.onProgressChange }}" onClick="{{ row.stop }}" style="width:36px;font-size:0.8125rem;color:var(--ns-fg-2);border:1px solid transparent;background:transparent;border-radius:4px;padding:1px 2px;text-align:right;font-family:inherit;" style-hover="background:var(--ns-ink-050);" style-focus="border:1px solid var(--ns-netskope-blue);background:#fff;"/>
+                          <span style="font-size:0.8125rem;color:var(--ns-fg-2);">%</span>
+                        </sc-if>
+                        <sc-if value="{{ row.hasChildren }}" hint-placeholder-val="{{ false }}">
+                          <span style="font-size:0.8125rem;color:var(--ns-fg-2);">{{ row.progress }}%</span>
+                        </sc-if>
+                      </div>
+                      <span onClick="{{ row.onDeleteRowClick }}" title="Delete task" style="display:flex;align-items:center;justify-content:center;color:var(--ns-fg-3);cursor:pointer;padding:4px;border-radius:4px;" style-hover="background:color-mix(in srgb, var(--ns-danger) 12%, white);color:var(--ns-danger);">
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                      </span>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ activeViewIsMilestones }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h2 style="margin:0 0 20px;font-size:1.75rem;font-weight:400;color:var(--ns-fg-1);">Milestones</h2>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;">
+            <sc-for list="{{ milestoneCards }}" as="m" hint-placeholder-count="3">
+              <div onClick="{{ m.select }}" style="background:#fff;border:1px solid var(--ns-border);border-radius:var(--ns-r-lg);padding:22px;box-shadow:var(--ns-shadow-1);cursor:pointer;">
+                <div style="font-size:1.0625rem;font-weight:500;color:var(--ns-fg-1);margin-bottom:4px;">{{ m.name }}</div>
+                <div style="font-size:0.8125rem;color:var(--ns-fg-3);margin-bottom:14px;">{{ m.rangeLabel }} · {{ m.taskCount }} items</div>
+                <div style="height:8px;background:var(--ns-ink-100);border-radius:999px;overflow:hidden;"><div style="{{ m.progressInner }}"></div></div>
+                <div style="display:flex;justify-content:space-between;margin-top:6px;margin-bottom:14px;"><span style="font-size:0.75rem;color:var(--ns-fg-3);">Progress</span><span style="font-size:0.75rem;color:var(--ns-fg-2);font-weight:500;">{{ m.progress }}%</span></div>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                  <sc-for list="{{ m.counts }}" as="c" hint-placeholder-count="4">
+                    <div style="display:flex;align-items:center;gap:5px;">
+                      <span style="width:8px;height:8px;border-radius:50%;background:{{ c.color }}"></span>
+                      <span style="font-size:0.75rem;color:var(--ns-fg-2);">{{ c.count }} {{ c.status }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ activeViewIsTimeline }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h2 style="margin:0 0 20px;font-size:1.75rem;font-weight:400;color:var(--ns-fg-1);">Timeline</h2>
+          <div style="display:flex;border:1px solid var(--ns-border);border-radius:var(--ns-r-lg);overflow:hidden;background:#fff;">
+            <div style="width:260px;flex-shrink:0;border-right:1px solid var(--ns-border);">
+              <div style="height:40px;border-bottom:1px solid var(--ns-divider);"></div>
+              <sc-for list="{{ rows }}" as="row" hint-placeholder-count="10">
+                <div>
+                  <sc-if value="{{ row.isMilestoneRow }}" hint-placeholder-val="{{ false }}">
+                    <div style="height:34px;display:flex;align-items:center;padding:0 12px;font-weight:500;color:var(--ns-deep-blue);font-size:0.8125rem;background:var(--ns-ink-050);border-bottom:1px solid var(--ns-divider);">{{ row.name }}</div>
+                  </sc-if>
+                  <sc-if value="{{ row.isTaskRow }}" hint-placeholder-val="{{ false }}">
+                    <div onClick="{{ row.select }}" style="{{ row.indentStyle }}; height:34px;display:flex;align-items:center;gap:6px;padding-right:12px;font-size:0.8125rem;color:var(--ns-fg-1);border-bottom:1px solid var(--ns-divider);cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">{{ row.name }}</div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <div style="flex:1;overflow-x:auto;">
+              <div style="{{ ganttHeaderStyle }}">
+                <sc-for list="{{ ganttTicks }}" as="tick" hint-placeholder-count="6">
+                  <div style="{{ tick.style }}">{{ tick.label }}</div>
+                </sc-for>
+              </div>
+              <sc-for list="{{ rows }}" as="row" hint-placeholder-count="10">
+                <div>
+                  <sc-if value="{{ row.isMilestoneRow }}" hint-placeholder-val="{{ false }}">
+                    <div style="{{ row.ganttMilestoneStyle }}"></div>
+                  </sc-if>
+                  <sc-if value="{{ row.isTaskRow }}" hint-placeholder-val="{{ false }}">
+                    <div style="{{ row.ganttRowStyle }}">
+                      <div onClick="{{ row.select }}" style="{{ row.ganttBarStyle }}" title="{{ row.name }}">{{ row.name }}</div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+
+  <sc-if value="{{ hasCommentsOverlay }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ commentsOverlay.close }}" style="position:fixed;inset:0;background:rgba(8,26,89,0.35);z-index:40;"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:480px;max-height:80vh;background:#fff;box-shadow:var(--ns-shadow-3);z-index:41;display:flex;flex-direction:column;border-radius:var(--ns-r-lg);overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--ns-divider);">
+        <div>
+          <div style="font-size:0.6875rem;font-weight:600;letter-spacing:0.06em;color:var(--ns-fg-3);margin-bottom:4px;">DETAILS</div>
+          <div style="font-size:1.0625rem;font-weight:500;color:var(--ns-fg-1);">{{ commentsOverlay.name }}</div>
+        </div>
+        <span onClick="{{ commentsOverlay.close }}" style="cursor:pointer;color:var(--ns-fg-3);display:flex;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></svg>
+        </span>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:18px 22px;display:flex;flex-direction:column;gap:16px;">
+        <div>
+          <div style="font-size:0.6875rem;font-weight:600;letter-spacing:0.06em;color:var(--ns-fg-3);margin-bottom:8px;">MILESTONE</div>
+          <select value="{{ commentsOverlay.milestoneId }}" onChange="{{ commentsOverlay.onMilestoneChange }}" style="width:100%;font-size:0.875rem;color:var(--ns-fg-1);border:1px solid var(--ns-border);background:#fff;border-radius:var(--ns-r-md);padding:7px 8px;font-family:inherit;cursor:pointer;box-sizing:border-box;">
+            <sc-for list="{{ commentsOverlay.milestoneOptions }}" as="ms" hint-placeholder-count="3"><option value="{{ ms.id }}">{{ ms.name }}</option></sc-for>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:0.6875rem;font-weight:600;letter-spacing:0.06em;color:var(--ns-fg-3);margin-bottom:8px;">NOTES</div>
+          <textarea value="{{ commentsOverlay.notes }}" onChange="{{ commentsOverlay.onNotesChange }}" placeholder="Add notes…" style="width:100%;min-height:120px;padding:10px;border:1px solid var(--ns-border);border-radius:var(--ns-r-md);font-size:0.875rem;line-height:1.5;color:var(--ns-fg-1);resize:vertical;box-sizing:border-box;font-family:inherit;white-space:pre-wrap;overflow-wrap:break-word;"></textarea>
+        </div>
+        <div style="font-size:0.6875rem;font-weight:600;letter-spacing:0.06em;color:var(--ns-fg-3);">UPDATES</div>
+        <sc-if value="{{ commentsOverlay.hasComments }}" hint-placeholder-val="{{ false }}">
+          <sc-for list="{{ commentsOverlay.comments }}" as="c" hint-placeholder-count="3">
+            <div style="border-bottom:1px solid var(--ns-divider);padding-bottom:10px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                <span style="font-size:0.8125rem;font-weight:500;color:var(--ns-fg-1);">{{ c.author }}</span>
+                <span style="font-size:0.75rem;color:var(--ns-fg-3);">{{ c.tsLabel }}</span>
+              </div>
+              <div style="font-size:0.8125rem;color:var(--ns-fg-2);line-height:1.5;white-space:pre-wrap;overflow-wrap:break-word;">{{ c.text }}</div>
+            </div>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{ commentsOverlay.hasCommentsFalse }}" hint-placeholder-val="{{ true }}">
+          <div style="font-size:0.8125rem;color:var(--ns-fg-3);">No updates yet.</div>
+        </sc-if>
+      </div>
+      <div style="padding:16px 22px;border-top:1px solid var(--ns-divider);background:var(--ns-bg-tint);">
+        <textarea value="{{ commentsOverlay.commentText }}" onChange="{{ commentsOverlay.onCommentChange }}" placeholder="Post a text update…" style="width:100%;min-height:120px;padding:10px;border:1px solid var(--ns-border);border-radius:var(--ns-r-md);font-size:0.875rem;line-height:1.5;resize:vertical;box-sizing:border-box;font-family:inherit;white-space:pre-wrap;overflow-wrap:break-word;"></textarea>
+        <button onClick="{{ commentsOverlay.onPostComment }}" style="margin-top:8px;padding:6px 14px;background:var(--ns-deep-blue);color:#fff;border:none;border-radius:var(--ns-r-md);font-size:0.8125rem;cursor:pointer;">Post</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hasDepsEditor }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ depsEditor.close }}" style="position:fixed;inset:0;background:rgba(8,26,89,0.35);z-index:40;"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:420px;max-height:70vh;background:#fff;box-shadow:var(--ns-shadow-3);z-index:41;display:flex;flex-direction:column;border-radius:var(--ns-r-lg);overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--ns-divider);">
+        <div>
+          <div style="font-size:0.6875rem;font-weight:600;letter-spacing:0.06em;color:var(--ns-fg-3);margin-bottom:4px;">DEPENDENCIES</div>
+          <div style="font-size:1.0625rem;font-weight:500;color:var(--ns-fg-1);">{{ depsEditor.name }}</div>
+        </div>
+        <span onClick="{{ depsEditor.close }}" style="cursor:pointer;color:var(--ns-fg-3);display:flex;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></svg>
+        </span>
+      </div>
+      <div style="padding:12px 22px 0;">
+        <input value="{{ depsEditor.filterText }}" onChange="{{ depsEditor.onFilterChange }}" placeholder="Filter tasks…" style="width:100%;font-size:0.8125rem;color:var(--ns-fg-1);border:1px solid var(--ns-border);background:#fff;border-radius:var(--ns-r-md);padding:7px 8px;font-family:inherit;box-sizing:border-box;"/>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:8px 12px;">
+        <sc-if value="{{ depsEditor.hasOptions }}" hint-placeholder-val="{{ true }}">
+          <sc-for list="{{ depsEditor.options }}" as="opt" hint-placeholder-count="6">
+            <div onClick="{{ opt.toggle }}" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--ns-r-md);cursor:pointer;" style-hover="background:var(--ns-ink-050);">
+              <input type="checkbox" checked="{{ opt.checked }}" readOnly="{{ true }}" style="width:15px;height:15px;flex-shrink:0;accent-color:var(--ns-deep-blue);pointer-events:none;"/>
+              <span style="font-size:0.75rem;color:var(--ns-fg-3);width:24px;flex-shrink:0;">#{{ opt.number }}</span>
+              <span style="font-size:0.875rem;color:var(--ns-fg-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ opt.name }}</span>
+            </div>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{ depsEditor.hasOptionsFalse }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:0.8125rem;color:var(--ns-fg-3);padding:10px;">No matching tasks.</div>
+        </sc-if>
+      </div>
+      <div style="padding:12px 22px;border-top:1px solid var(--ns-divider);background:var(--ns-bg-tint);font-size:0.75rem;color:var(--ns-fg-3);">Click a task to add or remove it as a dependency.</div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hasSettingsOverlay }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ settingsOverlay.close }}" style="position:fixed;inset:0;background:rgba(8,26,89,0.35);z-index:40;"></div>
+    <div onClick="{{ stopClick }}" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:460px;max-height:82vh;background:#fff;box-shadow:var(--ns-shadow-3);z-index:41;display:flex;flex-direction:column;border-radius:var(--ns-r-lg);overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--ns-divider);">
+        <div style="font-size:1.0625rem;font-weight:500;color:var(--ns-fg-1);">Settings</div>
+        <span onClick="{{ settingsOverlay.close }}" style="cursor:pointer;color:var(--ns-fg-3);display:flex;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></svg>
+        </span>
+      </div>
+      <div style="display:flex;gap:18px;padding:0 22px;border-bottom:1px solid var(--ns-divider);">
+        <div onClick="{{ settingsOverlay.onTabGeneral }}" style="{{ settingsOverlay.generalTabStyle }}">General</div>
+        <div onClick="{{ settingsOverlay.onTabProjects }}" style="{{ settingsOverlay.projectsTabStyle }}">Projects</div>
+      </div>
+      <sc-if value="{{ settingsOverlay.isGeneralTab }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:22px;">
+          <div>
+            <div style="font-size:0.9375rem;font-weight:500;color:var(--ns-fg-1);margin-bottom:4px;">Data storage</div>
+            <div style="font-size:0.8125rem;color:var(--ns-fg-3);line-height:1.5;">This project's tasks are saved automatically in your browser. Connect a Google account below to back them up to a spreadsheet, or restore from one.</div>
+          </div>
+          <div>
+            <div style="font-size:0.6875rem;font-weight:600;letter-spacing:0.06em;color:var(--ns-fg-3);margin-bottom:8px;">GOOGLE ACCOUNT</div>
+            <sc-if value="{{ settingsOverlay.isNotConnected }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ settingsOverlay.onConnect }}" style="padding:8px 16px;background:var(--ns-deep-blue);color:#fff;border:none;border-radius:var(--ns-r-md);font-size:0.8125rem;cursor:pointer;">Connect Google Account</button>
+            </sc-if>
+            <sc-if value="{{ settingsOverlay.isConnected }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--ns-border);border-radius:var(--ns-r-md);background:var(--ns-ink-050);">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:#2BAE66;flex-shrink:0;"></span>
+                  <sc-if value="{{ settingsOverlay.hasUserEmail }}" hint-placeholder-val="{{ false }}"><span style="font-size:0.8125rem;color:var(--ns-fg-1);">{{ settingsOverlay.userEmail }}</span></sc-if>
+                  <sc-if value="{{ settingsOverlay.hasUserEmailFalse }}" hint-placeholder-val="{{ true }}"><span style="font-size:0.8125rem;color:var(--ns-fg-1);">Connected</span></sc-if>
+                </div>
+                <span onClick="{{ settingsOverlay.onDisconnect }}" style="font-size:0.75rem;color:var(--ns-netskope-blue);cursor:pointer;">Disconnect</span>
+              </div>
+            </sc-if>
+          </div>
+          <div>
+            <div style="font-size:0.6875rem;font-weight:600;letter-spacing:0.06em;color:var(--ns-fg-3);margin-bottom:8px;">SPREADSHEET SYNC &middot; {{ settingsOverlay.activeProjectName }}</div>
+            <input value="{{ settingsOverlay.spreadsheetId }}" onChange="{{ settingsOverlay.onSpreadsheetIdChange }}" placeholder="Spreadsheet ID (from the sheet's URL)" style="width:100%;font-size:0.8125rem;color:var(--ns-fg-1);border:1px solid var(--ns-border);border-radius:var(--ns-r-md);padding:8px 10px;font-family:inherit;box-sizing:border-box;margin-bottom:10px;"/>
+            <div style="display:flex;gap:10px;">
+              <button onClick="{{ settingsOverlay.onSync }}" style="flex:1;padding:8px 12px;background:var(--ns-deep-blue);color:#fff;border:none;border-radius:var(--ns-r-md);font-size:0.8125rem;cursor:pointer;">Sync Now</button>
+            </div>
+            <div style="font-size:0.75rem;color:var(--ns-fg-3);margin-top:10px;">{{ settingsOverlay.lastBackupLabel }}</div>
+            <sc-if value="{{ settingsOverlay.hasStatus }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:0.75rem;color:var(--ns-netskope-blue);margin-top:6px;">{{ settingsOverlay.statusText }}</div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ settingsOverlay.isProjectsTab }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:0.8125rem;color:var(--ns-fg-3);line-height:1.5;">Deleting a project backs up its tasks first &mdash; to its linked spreadsheet if connected and configured, otherwise as a CSV download.</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <sc-for list="{{ settingsOverlay.projectsList }}" as="proj" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--ns-border);border-radius:var(--ns-r-md);">
+                <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:{{ proj.color }};flex-shrink:0;"></span>
+                  <div style="min-width:0;">
+                    <div style="font-size:0.8125rem;color:var(--ns-fg-1);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ proj.name }}</div>
+                    <div style="font-size:0.75rem;color:var(--ns-fg-3);">{{ proj.syncLabel }}</div>
+                  </div>
+                </div>
+                <span onClick="{{ proj.onDelete }}" title="Delete project" style="cursor:pointer;color:#D6336C;flex-shrink:0;display:flex;padding:6px;border-radius:var(--ns-r-md);" style-hover="background:var(--ns-ink-050);">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const CATEGORY_MAP = {
+  'Product': ['Requirements', 'Roadmap'],
+  'Design': ['UX', 'UI'],
+  'Engineering': ['Backend', 'Frontend', 'Infra'],
+  'QA': ['Test Planning', 'Execution'],
+  'Marketing': ['Content', 'Launch']
+};
+const CATEGORY_KEYS = Object.keys(CATEGORY_MAP);
+const ADD_NEW_VALUE = '+ Add new value…';
+const ASSIGNEES = ['Maya Chen', 'Priya Nair', 'Diego Ruiz', 'Sam Okafor', 'Lena Fischer', 'Jon Park'];
+const STATUS_OPTIONS = ['Not Started', 'In Progress', 'Blocked', 'Done'];
+const STATUS_COLOR = { 'Not Started': '#737982', 'In Progress': '#00A9CE', 'Blocked': '#D6336C', 'Done': '#2BAE66' };
+const TODAY = '2026-07-31';
+const GOOGLE_OAUTH_CLIENT_ID = ''; // configured server-side
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + Number(n || 0));
+  return d.toISOString().slice(0, 10);
+}
+function diffDays(a, b) {
+  return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+}
+function isWeekend(dateStr) {
+  const day = new Date(dateStr + 'T00:00:00').getDay();
+  return day === 0 || day === 6;
+}
+function nextWorkingDay(dateStr) {
+  let d = new Date(dateStr + 'T00:00:00');
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+function addWorkingDays(dateStr, n) {
+  let d = new Date(dateStr + 'T00:00:00');
+  const days = Number(n || 0);
+  let count = 0;
+  while (count < days) {
+    d.setDate(d.getDate() + 1);
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) count++;
+  }
+  return d.toISOString().slice(0, 10);
+}
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+function formatDateLong(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function formatTs(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' \u00b7 ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+function uid(prefix) { return prefix + '-' + Math.random().toString(36).slice(2, 9); }
+function existingInOrder(candidates, tasks, field) {
+  const present = new Set(tasks.map(t => t[field]).filter(Boolean));
+  return candidates.filter(v => present.has(v));
+}
+
+const PROJECT_STATE_KEYS = ['tasks', 'milestones', 'expanded', 'columnWidths', 'sortKey', 'sortDir', 'filters', 'customStatuses', 'customAssignees', 'customCategories', 'depsDraft', 'selectedTaskId', 'depsEditorTaskId', 'commentsOverlayId', 'newCommentText'];
+const PROJECT_COLORS = ['var(--ns-netskope-blue)', 'var(--ns-orange)', '#2BAE66', '#8B5CF6', '#D6336C', 'var(--ns-teal)'];
+function emptyProjectState() {
+  return {
+    tasks: [], milestones: [],
+    expanded: {}, columnWidths: { ...DEFAULT_COLUMN_WIDTHS }, sortKey: null, sortDir: 'asc',
+    filters: { status: 'All', category: 'All', assignee: 'All', milestone: 'All', search: '' },
+    customStatuses: [], customAssignees: [], customCategories: [],
+    depsDraft: {}, selectedTaskId: null, commentsOverlayId: null, depsEditorTaskId: null, newCommentText: ''
+  };
+}
+function snapshotProjectState(s) {
+  const snap = {};
+  PROJECT_STATE_KEYS.forEach(k => { snap[k] = s[k]; });
+  return snap;
+}
+const APP_STORAGE_KEY = 'pma_app_state_v1';
+const PERSIST_STATE_KEYS = ['tasks', 'milestones', 'expanded', 'columnWidths', 'sortKey', 'sortDir', 'filters', 'customStatuses', 'customAssignees', 'customCategories'];
+function snapshotForPersist(s) {
+  const snap = {};
+  PERSIST_STATE_KEYS.forEach(k => { snap[k] = s[k]; });
+  return snap;
+}
+function loadPersistedApp() {
+  try {
+    const raw = window.localStorage.getItem(APP_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+}
+function savePersistedApp(obj) {
+  try { window.localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(obj)); } catch (e) {}
+}
+
+const COLUMN_ORDER = ['number', 'name', 'category', 'status', 'assignee', 'start', 'estimate', 'end', 'deps', 'progress', 'actions'];
+const COLUMN_LABELS = { number: '#', name: 'Name', category: 'Category', status: 'Status', assignee: 'Assignee', start: 'Start', estimate: 'Estimate', end: 'Est. End', deps: 'Dependencies', progress: 'Progress', actions: '' };
+const DEFAULT_COLUMN_WIDTHS = { number: 40, name: 360, category: 150, status: 120, assignee: 110, start: 100, estimate: 90, end: 100, deps: 150, progress: 110, actions: 40 };
+const SORTABLE_COLUMNS = new Set(['name', 'category', 'status', 'assignee', 'start', 'estimate', 'end', 'progress']);
+
+function sortSiblings(list, sortKey, sortDir, display) {
+  if (!sortKey) return list;
+  const dir = sortDir === 'desc' ? -1 : 1;
+  const val = (t) => {
+    switch (sortKey) {
+      case 'name': return t.name.toLowerCase();
+      case 'category': return t.category;
+      case 'status': return t.status;
+      case 'assignee': return t.assignee;
+      case 'start': return t.startDate;
+      case 'estimate': return t.estimate || 0;
+      case 'end': return display[t.id] ? display[t.id].end : t.startDate;
+      case 'progress': return t.progress || 0;
+      default: return 0;
+    }
+  };
+  return [...list].sort((a, b) => {
+    const av = val(a), bv = val(b);
+    if (av < bv) return -1 * dir;
+    if (av > bv) return 1 * dir;
+    return 0;
+  });
+}
+
+function computeBaseSchedules(tasks) {
+  const byId = {};
+  tasks.forEach(t => { byId[t.id] = t; });
+  const memo = {};
+  function get(id, stack) {
+    if (memo[id]) return memo[id];
+    const t = byId[id];
+    if (!t) return { start: TODAY, end: TODAY };
+    if (stack.has(id)) return { start: t.startDate, end: t.startDate };
+    stack.add(id);
+    let start = nextWorkingDay(t.startDate);
+    (t.dependencies || []).forEach(depId => {
+      const ds = get(depId, stack);
+      const candidate = nextWorkingDay(addDays(ds.end, 1));
+      if (candidate > start) start = candidate;
+    });
+    const end = addWorkingDays(start, t.estimate || 0);
+    stack.delete(id);
+    const sched = { start, end };
+    memo[id] = sched;
+    return sched;
+  }
+  tasks.forEach(t => get(t.id, new Set()));
+  return memo;
+}
+function computeDisplaySchedules(tasks, base) {
+  const byParent = {};
+  tasks.forEach(t => { if (t.parentId) (byParent[t.parentId] = byParent[t.parentId] || []).push(t.id); });
+  const display = {};
+  tasks.forEach(t => { if (!byParent[t.id] || !byParent[t.id].length) display[t.id] = base[t.id]; });
+  tasks.forEach(t => {
+    const kids = byParent[t.id];
+    if (kids && kids.length) {
+      let start = null, end = null;
+      kids.forEach(k => {
+        const s = display[k] || base[k];
+        if (!start || s.start < start) start = s.start;
+        if (!end || s.end > end) end = s.end;
+      });
+      display[t.id] = { start, end };
+    }
+  });
+  return display;
+}
+function computeProgressMap(tasks) {
+  const byParent = {};
+  tasks.forEach(t => { if (t.parentId) (byParent[t.parentId] = byParent[t.parentId] || []).push(t.id); });
+  const prog = {};
+  tasks.forEach(t => { if (!byParent[t.id] || !byParent[t.id].length) prog[t.id] = t.progress || 0; });
+  tasks.forEach(t => {
+    const kids = byParent[t.id];
+    if (kids && kids.length) prog[t.id] = Math.round(kids.reduce((s, k) => s + (prog[k] || 0), 0) / kids.length);
+  });
+  return prog;
+}
+function computeCriticalSet(tasks, base) {
+  const byId = {}; tasks.forEach(t => byId[t.id] = t);
+  const leaves = tasks.filter(t => !tasks.some(o => o.parentId === t.id));
+  let endTask = null, maxEnd = null;
+  leaves.forEach(t => { const s = base[t.id]; if (s && (!maxEnd || s.end > maxEnd)) { maxEnd = s.end; endTask = t; } });
+  const crit = new Set();
+  let cur = endTask; const guard = new Set();
+  while (cur && !guard.has(cur.id)) {
+    crit.add(cur.id); guard.add(cur.id);
+    if (cur.parentId) crit.add(cur.parentId);
+    const deps = cur.dependencies || [];
+    if (!deps.length) break;
+    let next = null, nextEnd = null;
+    deps.forEach(depId => {
+      const dt = byId[depId]; if (!dt) return;
+      const s = base[depId];
+      if (s && (!nextEnd || s.end > nextEnd)) { nextEnd = s.end; next = dt; }
+    });
+    cur = next;
+  }
+  return crit;
+}
+function isDependentOn(tasks, aId, bId) {
+  const byId = {}; tasks.forEach(t => byId[t.id] = t);
+  const seen = new Set();
+  function walk(id) {
+    if (id === bId) return true;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    const t = byId[id]; if (!t) return false;
+    return (t.dependencies || []).some(walk);
+  }
+  return walk(aId);
+}
+
+function seedData() {
+  const milestones = [
+    { id: 'm1', name: 'Beta Release' },
+    { id: 'm2', name: 'GA Launch' },
+    { id: 'm3', name: 'Post-Launch Stabilization' }
+  ];
+  const tasks = [
+    { id: 't1', name: 'Finalize product requirements', milestoneId: 'm1', parentId: null, category: 'Product', subCategory: 'Requirements', assignee: 'Maya Chen', status: 'Done', estimate: 5, startDate: '2026-06-01', progress: 100, dependencies: [], comments: [] },
+    { id: 't2', name: 'Design system & UX flows', milestoneId: 'm1', parentId: null, category: 'Design', subCategory: 'UX', assignee: 'Priya Nair', status: 'Done', estimate: 8, startDate: '2026-06-08', progress: 100, dependencies: ['t1'], comments: [] },
+    { id: 't2a', name: 'Wireframe core flows', milestoneId: 'm1', parentId: 't2', category: 'Design', subCategory: 'UX', assignee: 'Priya Nair', status: 'Done', estimate: 3, startDate: '2026-06-08', progress: 100, dependencies: ['t1'], comments: [] },
+    { id: 't2b', name: 'High-fidelity mockups', milestoneId: 'm1', parentId: 't2', category: 'Design', subCategory: 'UI', assignee: 'Priya Nair', status: 'Done', estimate: 4, startDate: '2026-06-11', progress: 100, dependencies: ['t2a'], comments: [] },
+    {
+      id: 't3', name: 'Backend API v1', milestoneId: 'm1', parentId: null, category: 'Engineering', subCategory: 'Backend', assignee: 'Diego Ruiz', status: 'In Progress', estimate: 12, startDate: '2026-06-15', progress: 60, dependencies: ['t1'],
+      comments: [
+        { id: 'c1', author: 'Maya Chen', ts: '2026-07-25T09:05:00', text: "Let's make sure the dependency engine handles finish-to-start only for v1, we can extend later." },
+        { id: 'c2', author: 'Diego Ruiz', ts: '2026-07-28T14:20:00', text: 'Auth service merged to main, moving to task engine now.' }
+      ]
+    },
+    { id: 't3a', name: 'Auth & tenancy service', milestoneId: 'm1', parentId: 't3', category: 'Engineering', subCategory: 'Backend', assignee: 'Diego Ruiz', status: 'Done', estimate: 5, startDate: '2026-06-15', progress: 100, dependencies: ['t1'], comments: [] },
+    { id: 't3b', name: 'Task & dependency engine', milestoneId: 'm1', parentId: 't3', category: 'Engineering', subCategory: 'Backend', assignee: 'Diego Ruiz', status: 'In Progress', estimate: 7, startDate: '2026-06-22', progress: 40, dependencies: ['t3a'], comments: [] },
+    {
+      id: 't4', name: 'Frontend integration', milestoneId: 'm1', parentId: null, category: 'Engineering', subCategory: 'Frontend', assignee: 'Sam Okafor', status: 'In Progress', estimate: 10, startDate: '2026-07-06', progress: 25, dependencies: ['t2', 't3'],
+      comments: [{ id: 'c3', author: 'Sam Okafor', ts: '2026-07-29T16:40:00', text: 'Design handoff is solid, starting on the task tree component.' }]
+    },
+    { id: 't5', name: 'QA test pass - Beta', milestoneId: 'm1', parentId: null, category: 'QA', subCategory: 'Execution', assignee: 'Lena Fischer', status: 'Not Started', estimate: 6, startDate: '2026-07-20', progress: 0, dependencies: ['t4'], comments: [] },
+    { id: 't6', name: 'Beta customer onboarding guide', milestoneId: 'm1', parentId: null, category: 'Marketing', subCategory: 'Content', assignee: 'Jon Park', status: 'Not Started', estimate: 4, startDate: '2026-07-13', progress: 0, dependencies: ['t2'], comments: [] },
+    { id: 't7', name: 'Performance & scale testing', milestoneId: 'm2', parentId: null, category: 'QA', subCategory: 'Execution', assignee: 'Lena Fischer', status: 'Not Started', estimate: 8, startDate: '2026-07-20', progress: 0, dependencies: ['t5'], comments: [] },
+    {
+      id: 't8', name: 'Security review', milestoneId: 'm2', parentId: null, category: 'Engineering', subCategory: 'Infra', assignee: 'Diego Ruiz', status: 'Blocked', estimate: 5, startDate: '2026-07-20', progress: 10, dependencies: ['t3'],
+      comments: [{ id: 'c4', author: 'Diego Ruiz', ts: '2026-07-30T11:00:00', text: 'Blocked on pen-test vendor scheduling, following up today.' }]
+    },
+    { id: 't9', name: 'GA marketing launch plan', milestoneId: 'm2', parentId: null, category: 'Marketing', subCategory: 'Launch', assignee: 'Jon Park', status: 'Not Started', estimate: 6, startDate: '2026-07-13', progress: 0, dependencies: ['t6'], comments: [] },
+    { id: 't10', name: 'Pricing & packaging finalization', milestoneId: 'm2', parentId: null, category: 'Product', subCategory: 'Requirements', assignee: 'Maya Chen', status: 'Done', estimate: 4, startDate: '2026-06-08', progress: 100, dependencies: ['t1'], comments: [] },
+    { id: 't11', name: 'Customer feedback triage', milestoneId: 'm3', parentId: null, category: 'Product', subCategory: 'Requirements', assignee: 'Maya Chen', status: 'Not Started', estimate: 5, startDate: '2026-08-10', progress: 0, dependencies: ['t7', 't9'], comments: [] },
+    { id: 't12', name: 'Hotfix & stabilization sprint', milestoneId: 'm3', parentId: null, category: 'Engineering', subCategory: 'Backend', assignee: 'Diego Ruiz', status: 'Not Started', estimate: 6, startDate: '2026-08-10', progress: 0, dependencies: ['t7', 't8'], comments: [] }
+  ];
+  return { milestones, tasks };
+}
+
+class Component extends DCLogic {
+  state = {
+    activeView: 'dashboard',
+    activeProjectId: 'p1',
+    projects: [{ id: 'p1', name: 'Cloud Platform Migration', color: PROJECT_COLORS[0], spreadsheetId: '', lastBackupAt: null }],
+    savedProjects: {},
+    settingsOpen: false,
+    settingsTab: 'general',
+    googleAccessToken: null,
+    googleUserEmail: null,
+    googleStatus: '',
+    googleBusy: false,
+    expanded: {},
+    selectedTaskId: null,
+    commentsOverlayId: null,
+    depsEditorTaskId: null,
+    depsFilterText: '',
+    columnWidths: { ...DEFAULT_COLUMN_WIDTHS },
+    sortKey: null,
+    sortDir: 'asc',
+    filters: { status: 'All', category: 'All', assignee: 'All', milestone: 'All', search: '' },
+    newCommentText: '',
+    depsDraft: {},
+    customStatuses: [],
+    customAssignees: [],
+    customCategories: [],
+    ...seedData()
+  };
+
+  componentDidMount() {
+    const persisted = loadPersistedApp();
+    if (persisted && persisted.projects && persisted.projects.length) {
+      const activeId = persisted.activeProjectId || persisted.projects[0].id;
+      const projectData = persisted.projectData || {};
+      const activeData = projectData[activeId] || emptyProjectState();
+      const savedProjects = { ...projectData };
+      delete savedProjects[activeId];
+      this.setState({
+        projects: persisted.projects,
+        activeProjectId: activeId,
+        savedProjects,
+        ...activeData
+      });
+    }
+  }
+  componentDidUpdate() {
+    if (this._persistTimer) clearTimeout(this._persistTimer);
+    this._persistTimer = setTimeout(() => this.persistApp(), 400);
+  }
+  persistApp() {
+    const s = this.state;
+    const projectData = { ...s.savedProjects, [s.activeProjectId]: snapshotForPersist(s) };
+    savePersistedApp({ projects: s.projects, activeProjectId: s.activeProjectId, projectData });
+  }
+  updateProjectField(id, field, value) {
+    this.setState(s => ({ projects: s.projects.map(p => p.id === id ? { ...p, [field]: value } : p) }));
+  }
+  exportProjectCsv(tasks, milestones, projectName) {
+    const milestoneById = {}; (milestones || []).forEach(m => milestoneById[m.id] = m);
+    const base = computeBaseSchedules(tasks || []);
+    const headers = ['Name', 'Milestone', 'Category', 'Sub-category', 'Assignee', 'Status', 'Start Date', 'Estimate (days)', 'Est. End Date', 'Progress %', 'Dependencies'];
+    const esc = (v) => {
+      const str = String(v == null ? '' : v);
+      return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
+    };
+    const rows = [headers].concat((tasks || []).map(t => {
+      const sched = base[t.id] || {};
+      const depNames = (t.dependencies || []).map(id => { const d = (tasks || []).find(x => x.id === id); return d ? d.name : id; }).join('; ');
+      return [
+        t.name, (milestoneById[t.milestoneId] && milestoneById[t.milestoneId].name) || '', t.category || '', t.subCategory || '',
+        t.assignee || '', t.status || '', t.startDate || '', t.estimate || 0, sched.end || '', t.progress || 0, depNames
+      ];
+    }));
+    const csv = rows.map(r => r.map(esc).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (projectName || 'project').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '-tasks.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  exportTasksCsv() {
+    const s = this.state;
+    const projectName = (s.projects.find(p => p.id === s.activeProjectId) || {}).name || 'project';
+    this.exportProjectCsv(s.tasks, s.milestones, projectName);
+  }
+  backupProjectDataToSheet(spreadsheetId, token, tasks, milestones) {
+    const taskHeaders = ['id', 'name', 'milestoneId', 'parentId', 'category', 'subCategory', 'assignee', 'status', 'estimate', 'startDate', 'progress', 'dependencies', 'comments', 'notes'];
+    const taskRows = [taskHeaders].concat((tasks || []).map(t => [
+      t.id, t.name, t.milestoneId || '', t.parentId || '', t.category || '', t.subCategory || '', t.assignee || '',
+      t.status || '', t.estimate || 0, t.startDate || '', t.progress || 0, (t.dependencies || []).join(','), JSON.stringify(t.comments || []), t.notes || ''
+    ]));
+    const msRows = [['id', 'name']].concat((milestones || []).map(m => [m.id, m.name]));
+    return this.ensureSheetTabs(spreadsheetId, token).then(() =>
+      fetch('https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values:batchUpdate', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ valueInputOption: 'RAW', data: [{ range: 'Tasks!A1', values: taskRows }, { range: 'Milestones!A1', values: msRows }] })
+      }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); })
+    );
+  }
+  deleteProject(id) {
+    const s = this.state;
+    const project = s.projects.find(p => p.id === id);
+    if (!project) return;
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('Delete "' + project.name + '"? This backs up its tasks first.')) return;
+    const isActive = id === s.activeProjectId;
+    const snapshot = isActive ? s : (s.savedProjects[id] || emptyProjectState());
+    const tasks = snapshot.tasks || [];
+    const milestones = snapshot.milestones || [];
+    const spreadsheetId = (project.spreadsheetId || '').trim();
+    const token = s.googleAccessToken;
+    const finish = () => this.finalizeProjectDelete(id);
+    if (token && spreadsheetId && token !== 'stub-token') {
+      this.setState({ googleBusy: true, googleStatus: 'Backing up before delete\u2026' });
+      this.backupProjectDataToSheet(spreadsheetId, token, tasks, milestones)
+        .then(() => { this.setState({ googleBusy: false, googleStatus: 'Backed up "' + project.name + '" and deleted.' }); finish(); })
+        .catch(() => { this.exportProjectCsv(tasks, milestones, project.name); this.setState({ googleBusy: false, googleStatus: 'Backup failed \u2014 downloaded CSV instead.' }); finish(); });
+    } else {
+      this.exportProjectCsv(tasks, milestones, project.name);
+      this.setState({ googleStatus: 'Downloaded CSV backup of "' + project.name + '" before deleting.' });
+      finish();
+    }
+  }
+  finalizeProjectDelete(id) {
+    this.setState(s => {
+      const projects = s.projects.filter(p => p.id !== id);
+      const savedProjects = { ...s.savedProjects };
+      delete savedProjects[id];
+      if (id !== s.activeProjectId) return { projects, savedProjects };
+      if (projects.length) {
+        const nextId = projects[0].id;
+        const restored = savedProjects[nextId] || emptyProjectState();
+        delete savedProjects[nextId];
+        return { projects, savedProjects, activeProjectId: nextId, ...restored, activeView: 'dashboard' };
+      }
+      const newId = uid('p');
+      const fresh = emptyProjectState();
+      return {
+        projects: [{ id: newId, name: 'New Project', color: PROJECT_COLORS[0], spreadsheetId: '', lastBackupAt: null }],
+        savedProjects: {}, activeProjectId: newId, ...fresh, activeView: 'dashboard'
+      };
+    });
+  }
+  toggleSettings() { this.setState(s => ({ settingsOpen: !s.settingsOpen, settingsTab: 'general' })); }
+  closeSettings() { this.setState({ settingsOpen: false }); }
+  setSettingsTab(tab) { this.setState({ settingsTab: tab }); }
+  connectGoogle() {
+    this.setState({ googleAccessToken: 'stub-token', googleUserEmail: 'you@example.com', googleStatus: 'Connected (stub)' });
+    return;
+    const clientId = GOOGLE_OAUTH_CLIENT_ID;
+    if (typeof window === 'undefined' || !window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+      this.setState({ googleStatus: 'Google sign-in library is still loading, try again in a moment.' });
+      return;
+    }
+    this.setState({ googleBusy: true, googleStatus: 'Connecting\u2026' });
+    try {
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email',
+        callback: (resp) => {
+          if (!resp || resp.error) { this.setState({ googleBusy: false, googleStatus: 'Sign-in failed: ' + ((resp && resp.error) || 'unknown error') }); return; }
+          this.setState({ googleAccessToken: resp.access_token, googleBusy: false, googleStatus: 'Connected.' });
+          this.fetchGoogleEmail(resp.access_token);
+        }
+      });
+      tokenClient.requestAccessToken();
+    } catch (e) {
+      this.setState({ googleBusy: false, googleStatus: 'Sign-in failed: ' + e.message });
+    }
+  }
+  disconnectGoogle() { this.setState({ googleAccessToken: null, googleUserEmail: null, googleStatus: '' }); }
+  fetchGoogleEmail(token) {
+    fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + token } })
+      .then(r => r.json()).then(d => this.setState({ googleUserEmail: d.email || null })).catch(() => {});
+  }
+  ensureSheetTabs(spreadsheetId, token) {
+    return fetch('https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '?fields=sheets.properties.title', { headers: { Authorization: 'Bearer ' + token } })
+      .then(r => { if (!r.ok) throw new Error('Could not open spreadsheet (HTTP ' + r.status + ')'); return r.json(); })
+      .then(meta => {
+        const titles = (meta.sheets || []).map(sh => sh.properties.title);
+        const requests = [];
+        if (!titles.includes('Tasks')) requests.push({ addSheet: { properties: { title: 'Tasks' } } });
+        if (!titles.includes('Milestones')) requests.push({ addSheet: { properties: { title: 'Milestones' } } });
+        if (!requests.length) return null;
+        return fetch('https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + ':batchUpdate', {
+          method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requests })
+        });
+      });
+  }
+  backupToSheet() {
+    const s = this.state;
+    const project = s.projects.find(p => p.id === s.activeProjectId);
+    const spreadsheetId = ((project && project.spreadsheetId) || '').trim();
+    const token = s.googleAccessToken;
+    if (!token) { this.setState({ googleStatus: 'Connect your Google account first.' }); return; }
+    if (!spreadsheetId) { this.setState({ googleStatus: 'Enter a spreadsheet ID first.' }); return; }
+    this.setState({ googleBusy: true, googleStatus: 'Backing up\u2026' });
+    const taskHeaders = ['id', 'name', 'milestoneId', 'parentId', 'category', 'subCategory', 'assignee', 'status', 'estimate', 'startDate', 'progress', 'dependencies', 'comments', 'notes'];
+    const taskRows = [taskHeaders].concat(s.tasks.map(t => [
+      t.id, t.name, t.milestoneId || '', t.parentId || '', t.category || '', t.subCategory || '', t.assignee || '',
+      t.status || '', t.estimate || 0, t.startDate || '', t.progress || 0, (t.dependencies || []).join(','), JSON.stringify(t.comments || []), t.notes || ''
+    ]));
+    const msRows = [['id', 'name']].concat(s.milestones.map(m => [m.id, m.name]));
+    this.ensureSheetTabs(spreadsheetId, token).then(() =>
+      fetch('https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values:batchUpdate', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ valueInputOption: 'RAW', data: [{ range: 'Tasks!A1', values: taskRows }, { range: 'Milestones!A1', values: msRows }] })
+      })
+    ).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(() => this.setState(st => ({ googleBusy: false, googleStatus: 'Backed up at ' + new Date().toLocaleTimeString(), projects: st.projects.map(p => p.id === st.activeProjectId ? { ...p, lastBackupAt: Date.now() } : p) })))
+      .catch(err => this.setState({ googleBusy: false, googleStatus: 'Backup failed: ' + err.message }));
+  }
+  restoreFromSheet() {
+    const s = this.state;
+    const project = s.projects.find(p => p.id === s.activeProjectId);
+    const spreadsheetId = ((project && project.spreadsheetId) || '').trim();
+    const token = s.googleAccessToken;
+    if (!token) { this.setState({ googleStatus: 'Connect your Google account first.' }); return; }
+    if (!spreadsheetId) { this.setState({ googleStatus: 'Enter a spreadsheet ID first.' }); return; }
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('Replace current project data with the spreadsheet backup?')) return;
+    this.setState({ googleBusy: true, googleStatus: 'Loading\u2026' });
+    Promise.all([
+      fetch('https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/Tasks', { headers: { Authorization: 'Bearer ' + token } }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }),
+      fetch('https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/Milestones', { headers: { Authorization: 'Bearer ' + token } }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    ]).then(([taskRes, msRes]) => {
+      const trows = taskRes.values || [];
+      if (trows.length < 1) throw new Error('No data found in Tasks sheet');
+      const theader = trows[0];
+      const tasks = trows.slice(1).map(row => {
+        const obj = {}; theader.forEach((h, i) => { obj[h] = row[i]; });
+        return {
+          id: obj.id, name: obj.name || '', milestoneId: obj.milestoneId || null, parentId: obj.parentId || null,
+          category: obj.category || '', subCategory: obj.subCategory || '', assignee: obj.assignee || '',
+          status: obj.status || 'Not Started', estimate: parseInt(obj.estimate || '0', 10) || 0, startDate: obj.startDate || TODAY,
+          progress: parseInt(obj.progress || '0', 10) || 0,
+          dependencies: obj.dependencies ? String(obj.dependencies).split(',').map(x => x.trim()).filter(Boolean) : [],
+          comments: (() => { try { return JSON.parse(obj.comments || '[]'); } catch (e) { return []; } })(),
+          notes: obj.notes || ''
+        };
+      });
+      const mrows = msRes.values || [['id', 'name']];
+      const mheader = mrows[0];
+      const milestones = mrows.slice(1).map(row => { const obj = {}; mheader.forEach((h, i) => { obj[h] = row[i]; }); return { id: obj.id, name: obj.name || '' }; });
+      this.setState({ tasks, milestones, expanded: {}, selectedTaskId: null, googleBusy: false, googleStatus: 'Loaded backup at ' + new Date().toLocaleTimeString() });
+    }).catch(err => this.setState({ googleBusy: false, googleStatus: 'Load failed: ' + err.message }));
+  }
+  syncToSheet() {
+    const s = this.state;
+    if (s.googleAccessToken === 'stub-token') {
+      this.setState(st => ({ googleBusy: true, googleStatus: 'Syncing\u2026' }));
+      setTimeout(() => this.setState(st => ({
+        googleBusy: false, googleStatus: 'Synced at ' + new Date().toLocaleTimeString(),
+        projects: st.projects.map(p => p.id === st.activeProjectId ? { ...p, lastBackupAt: Date.now() } : p)
+      })), 600);
+      return;
+    }
+    const project = s.projects.find(p => p.id === s.activeProjectId);
+    const spreadsheetId = ((project && project.spreadsheetId) || '').trim();
+    const token = s.googleAccessToken;
+    if (!token) { this.setState({ googleStatus: 'Connect your Google account first.' }); return; }
+    if (!spreadsheetId) { this.setState({ googleStatus: 'Enter a spreadsheet ID first.' }); return; }
+    this.setState({ googleBusy: true, googleStatus: 'Syncing\u2026' });
+    const parseRows = (rows, kind) => {
+      if (!rows || rows.length < 1) return [];
+      const header = rows[0];
+      return rows.slice(1).map(row => {
+        const obj = {}; header.forEach((h, i) => { obj[h] = row[i]; });
+        if (kind === 'milestone') return { id: obj.id, name: obj.name || '' };
+        return {
+          id: obj.id, name: obj.name || '', milestoneId: obj.milestoneId || null, parentId: obj.parentId || null,
+          category: obj.category || '', subCategory: obj.subCategory || '', assignee: obj.assignee || '',
+          status: obj.status || 'Not Started', estimate: parseInt(obj.estimate || '0', 10) || 0, startDate: obj.startDate || TODAY,
+          progress: parseInt(obj.progress || '0', 10) || 0,
+          dependencies: obj.dependencies ? String(obj.dependencies).split(',').map(x => x.trim()).filter(Boolean) : [],
+          comments: (() => { try { return JSON.parse(obj.comments || '[]'); } catch (e) { return []; } })(),
+          notes: obj.notes || ''
+        };
+      });
+    };
+    this.ensureSheetTabs(spreadsheetId, token).then(() => Promise.all([
+      fetch('https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/Tasks', { headers: { Authorization: 'Bearer ' + token } }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }),
+      fetch('https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/Milestones', { headers: { Authorization: 'Bearer ' + token } }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    ])).then(([taskRes, msRes]) => {
+      const remoteTasks = parseRows(taskRes.values, 'task');
+      const remoteMilestones = parseRows(msRes.values, 'milestone');
+      const localState = this.state;
+      // Two-way merge: local edits win for shared ids, remote-only items are pulled in.
+      const taskMap = new Map(remoteTasks.map(t => [t.id, t]));
+      localState.tasks.forEach(t => taskMap.set(t.id, t));
+      const mergedTasks = Array.from(taskMap.values());
+      const msMap = new Map(remoteMilestones.map(m => [m.id, m]));
+      localState.milestones.forEach(m => msMap.set(m.id, m));
+      const mergedMilestones = Array.from(msMap.values());
+      const taskHeaders = ['id', 'name', 'milestoneId', 'parentId', 'category', 'subCategory', 'assignee', 'status', 'estimate', 'startDate', 'progress', 'dependencies', 'comments', 'notes'];
+      const taskRows = [taskHeaders].concat(mergedTasks.map(t => [
+        t.id, t.name, t.milestoneId || '', t.parentId || '', t.category || '', t.subCategory || '', t.assignee || '',
+        t.status || '', t.estimate || 0, t.startDate || '', t.progress || 0, (t.dependencies || []).join(','), JSON.stringify(t.comments || []), t.notes || ''
+      ]));
+      const msRows = [['id', 'name']].concat(mergedMilestones.map(m => [m.id, m.name]));
+      return fetch('https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values:batchUpdate', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ valueInputOption: 'RAW', data: [{ range: 'Tasks!A1', values: taskRows }, { range: 'Milestones!A1', values: msRows }] })
+      }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(() => this.setState(st => ({
+          tasks: mergedTasks, milestones: mergedMilestones, googleBusy: false,
+          googleStatus: 'Synced at ' + new Date().toLocaleTimeString(),
+          projects: st.projects.map(p => p.id === st.activeProjectId ? { ...p, lastBackupAt: Date.now() } : p)
+        })));
+    }).catch(err => this.setState({ googleBusy: false, googleStatus: 'Sync failed: ' + err.message }));
+  }
+  setView(v) { this.setState({ activeView: v }); }
+  toggleProjectMenu() { this.setState(s => ({ projectMenuOpen: !s.projectMenuOpen })); }
+  closeProjectMenu() { this.setState({ projectMenuOpen: false }); }
+  switchProject(id) {
+    this.setState(s => {
+      if (id === s.activeProjectId) return { activeView: 'dashboard', projectMenuOpen: false };
+      const savedProjects = { ...s.savedProjects, [s.activeProjectId]: snapshotProjectState(s) };
+      const restored = savedProjects[id] || emptyProjectState();
+      delete savedProjects[id];
+      return { activeProjectId: id, savedProjects, ...restored, activeView: 'dashboard', projectMenuOpen: false };
+    });
+  }
+  createProject(name) {
+    this.setState(s => {
+      const id = uid('p');
+      const savedProjects = { ...s.savedProjects, [s.activeProjectId]: snapshotProjectState(s) };
+      return {
+        projects: [...s.projects, { id, name, color: PROJECT_COLORS[s.projects.length % PROJECT_COLORS.length], spreadsheetId: '', lastBackupAt: null }],
+        savedProjects,
+        activeProjectId: id,
+        ...emptyProjectState(),
+        activeView: 'dashboard',
+        projectMenuOpen: false
+      };
+    });
+  }
+  promptNewProject() {
+    const name = (typeof window !== 'undefined' && window.prompt) ? window.prompt('New project name:') : null;
+    if (!name || !name.trim()) return;
+    this.createProject(name.trim());
+  }
+  renameProject(id, name) { this.setState(s => ({ projects: s.projects.map(p => p.id === id ? { ...p, name } : p) })); }
+  deleteProject(id) {
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('Delete this project?')) return;
+    this.setState(s => {
+      if (s.projects.length <= 1) return null;
+      const projects = s.projects.filter(p => p.id !== id);
+      const savedProjects = { ...s.savedProjects };
+      delete savedProjects[id];
+      if (s.activeProjectId === id) {
+        const nextId = projects[0].id;
+        const restored = savedProjects[nextId] || emptyProjectState();
+        delete savedProjects[nextId];
+        return { projects, savedProjects, activeProjectId: nextId, ...restored, activeView: 'dashboard' };
+      }
+      return { projects, savedProjects };
+    });
+  }
+  toggleExpand(id) { this.setState(s => ({ expanded: { ...s.expanded, [id]: s.expanded[id] === false ? true : false } })); }
+  onNameKeyDown(e, id) {
+    if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); return; }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (e.shiftKey) this.outdentTask(id); else this.indentTask(id);
+      requestAnimationFrame(() => {
+        const el = document.querySelector('[data-task-id="' + id + '"]');
+        if (el) { el.focus(); const v = el.value; el.setSelectionRange(v.length, v.length); }
+      });
+    }
+  }
+  indentTask(id) {
+    this.setState(s => {
+      const tasks = s.tasks;
+      const idx = tasks.findIndex(t => t.id === id);
+      if (idx < 0) return null;
+      const t = tasks[idx];
+      if (t.parentId) return null;
+      let prev = null;
+      for (let i = idx - 1; i >= 0; i--) {
+        const c = tasks[i];
+        if (c.milestoneId !== t.milestoneId) break;
+        if (!c.parentId) { prev = c; break; }
+      }
+      if (!prev) return null;
+      const newTasks = tasks.map(x => x.id === id ? { ...x, parentId: prev.id, milestoneId: prev.milestoneId } : x);
+      return { tasks: newTasks, expanded: { ...s.expanded, [prev.id]: true } };
+    });
+  }
+  outdentTask(id) {
+    this.setState(s => {
+      const tasks = s.tasks;
+      const t = tasks.find(x => x.id === id);
+      if (!t || !t.parentId) return null;
+      const parentId = t.parentId;
+      const promoted = tasks.map(x => x.id === id ? { ...x, parentId: null } : x);
+      const withoutT = promoted.filter(x => x.id !== id);
+      const parentPos = withoutT.findIndex(x => x.id === parentId);
+      let insertPos = parentPos + 1;
+      while (insertPos < withoutT.length && withoutT[insertPos].parentId === parentId) insertPos++;
+      withoutT.splice(insertPos, 0, promoted.find(x => x.id === id));
+      return { tasks: withoutT };
+    });
+  }
+  selectTask(id) { this.setState({ selectedTaskId: id }); }
+  closeDetail() { this.setState({ selectedTaskId: null }); }
+  openCommentsOverlay(id) { this.setState({ commentsOverlayId: id }); }
+  closeCommentsOverlay() { this.setState({ commentsOverlayId: null }); }
+  openDepsEditor(id) { this.setState({ depsEditorTaskId: id, depsFilterText: '' }); }
+  closeDepsEditor() { this.setState({ depsEditorTaskId: null, depsFilterText: '' }); }
+  toggleDependency(taskId, depId) {
+    const t = this.state.tasks.find(x => x.id === taskId);
+    if (!t) return;
+    if ((t.dependencies || []).includes(depId)) this.removeDependency(taskId, depId);
+    else this.addDependency(taskId, depId);
+  }
+  toggleSort(key) {
+    this.setState(s => s.sortKey === key ? { sortDir: s.sortDir === 'asc' ? 'desc' : 'asc' } : { sortKey: key, sortDir: 'asc' });
+  }
+  startColumnResize(key, e) {
+    e.preventDefault(); e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = this.state.columnWidths[key];
+    const onMove = (ev) => {
+      const w = Math.max(50, startWidth + (ev.clientX - startX));
+      this.setState(s => ({ columnWidths: { ...s.columnWidths, [key]: w } }));
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+  onDepsDraftChange(taskId, value) {
+    this.setState(s => ({ depsDraft: { ...s.depsDraft, [taskId]: value } }));
+  }
+  commitDepsDraft(taskId, numberToId) {
+    this.setState(s => {
+      const draft = s.depsDraft[taskId];
+      if (draft === undefined) return null;
+      const ids = draft.split(',').map(x => x.trim()).filter(Boolean).map(n => numberToId[n]).filter(id => id && id !== taskId);
+      const nextDraft = { ...s.depsDraft };
+      delete nextDraft[taskId];
+      return {
+        depsDraft: nextDraft,
+        tasks: s.tasks.map(t => t.id === taskId ? { ...t, dependencies: [...new Set(ids)] } : t)
+      };
+    });
+  }
+  onInlineCommentChange(taskId, text) {
+    this.setState(s => ({
+      tasks: s.tasks.map(t => {
+        if (t.id !== taskId) return t;
+        const comments = t.comments || [];
+        if (!comments.length) return { ...t, comments: [{ id: uid('c'), author: 'You', ts: new Date().toISOString(), text }] };
+        const sorted = [...comments].sort((a, b) => new Date(b.ts) - new Date(a.ts));
+        const latestId = sorted[0].id;
+        return { ...t, comments: comments.map(c => c.id === latestId ? { ...c, text } : c) };
+      })
+    }));
+  }
+  setFilter(key, val) { this.setState(s => ({ filters: { ...s.filters, [key]: val } })); }
+  promptAndAdd(listKey, applyFn) {
+    const val = (typeof window !== 'undefined' && window.prompt) ? window.prompt('Enter new value:') : null;
+    if (!val || !val.trim()) return;
+    const trimmed = val.trim();
+    this.setState(s => ({ [listKey]: [...s[listKey], trimmed] }));
+    applyFn(trimmed);
+  }
+  handleValueSelect(e, listKey, applyFn) {
+    if (e.target.value === ADD_NEW_VALUE) { this.promptAndAdd(listKey, applyFn); return; }
+    applyFn(e.target.value);
+  }
+  commitFreeformValue(rawValue, listKey, existingOptions, applyFn) {
+    const trimmed = (rawValue || '').trim();
+    if (!trimmed) return;
+    applyFn(trimmed);
+    if (existingOptions.some(v => v.toLowerCase() === trimmed.toLowerCase())) return;
+    this.setState(s => {
+      if (s[listKey].some(v => v.toLowerCase() === trimmed.toLowerCase())) return null;
+      return { [listKey]: [...s[listKey], trimmed] };
+    });
+  }
+  removeCustomValue(listKey, value, taskField, fallback) {
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('Remove "' + value + '"? Tasks using it will be reset to "' + fallback + '".')) return;
+    this.setState(s => ({
+      [listKey]: s[listKey].filter(v => v !== value),
+      tasks: s.tasks.map(t => t[taskField] === value ? { ...t, [taskField]: fallback } : t)
+    }));
+  }
+  removeMilestone(id) {
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('Remove this milestone? Tasks using it will be unassigned from it.')) return;
+    this.setState(s => ({
+      milestones: s.milestones.filter(m => m.id !== id),
+      tasks: s.tasks.map(t => t.milestoneId === id ? { ...t, milestoneId: null } : t)
+    }));
+  }
+  updateTask(id, patch) { this.setState(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t) })); }
+  updateMilestone(id, patch) { this.setState(s => ({ milestones: s.milestones.map(m => m.id === id ? { ...m, ...patch } : m) })); }
+  addDependency(taskId, depId) {
+    if (!depId) return;
+    this.setState(s => ({ tasks: s.tasks.map(t => t.id === taskId ? { ...t, dependencies: [...t.dependencies, depId] } : t) }));
+  }
+  removeDependency(taskId, depId) {
+    this.setState(s => ({ tasks: s.tasks.map(t => t.id === taskId ? { ...t, dependencies: t.dependencies.filter(d => d !== depId) } : t) }));
+  }
+  addComment(taskId) {
+    const text = (this.state.newCommentText || '').trim();
+    if (!text) return;
+    const comment = { id: uid('c'), author: 'You', ts: new Date().toISOString(), text };
+    this.setState(s => ({ tasks: s.tasks.map(t => t.id === taskId ? { ...t, comments: [...t.comments, comment] } : t), newCommentText: '' }));
+  }
+  addTask() {
+    this.setState(s => {
+      const id = uid('t');
+      let milestones = s.milestones;
+      if (!milestones.length) milestones = [{ id: uid('m'), name: 'Milestone 1' }];
+      const anchor = s.selectedTaskId ? s.tasks.find(t => t.id === s.selectedTaskId) : null;
+      const milestoneId = anchor ? anchor.milestoneId : milestones[0].id;
+      const parentId = anchor ? anchor.parentId : null;
+      const category = anchor ? anchor.category : CATEGORY_KEYS[0];
+      const subCategory = anchor ? anchor.subCategory : CATEGORY_MAP[CATEGORY_KEYS[0]][0];
+      const assignee = anchor ? anchor.assignee : ASSIGNEES[0];
+      const startDate = anchor ? anchor.startDate : TODAY;
+      const task = { id, name: 'New task', milestoneId, parentId, category, subCategory, assignee, status: 'Not Started', estimate: 3, startDate, progress: 0, dependencies: [], comments: [] };
+      let tasks;
+      if (anchor) {
+        const idx = s.tasks.findIndex(t => t.id === anchor.id);
+        tasks = [...s.tasks.slice(0, idx + 1), task, ...s.tasks.slice(idx + 1)];
+      } else {
+        tasks = [...s.tasks, task];
+      }
+      return { tasks, milestones, activeView: 'tasks' };
+    });
+  }
+  moveTaskToMilestone(id, milestoneId) {
+    this.setState(s => ({
+      tasks: s.tasks.map(t => {
+        if (t.id === id) return { ...t, milestoneId, parentId: null };
+        if (t.parentId === id) return { ...t, milestoneId };
+        return t;
+      })
+    }));
+  }
+  addSubtask(parentId) {
+    const parent = this.state.tasks.find(t => t.id === parentId);
+    if (!parent) return;
+    const id = uid('t');
+    const sub = { id, name: 'New subtask', milestoneId: parent.milestoneId, parentId, category: parent.category, subCategory: parent.subCategory, assignee: parent.assignee, status: 'Not Started', estimate: 2, startDate: parent.startDate, progress: 0, dependencies: [], comments: [] };
+    this.setState(s => ({ tasks: [...s.tasks, sub], selectedTaskId: id, expanded: { ...s.expanded, [parentId]: true } }));
+  }
+  deleteTask(id) {
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('Delete this item and its subtasks?')) return;
+    this.setState(s => {
+      const toRemove = new Set([id]);
+      s.tasks.forEach(t => { if (t.parentId === id) toRemove.add(t.id); });
+      const tasks = s.tasks.filter(t => !toRemove.has(t.id)).map(t => ({ ...t, dependencies: (t.dependencies || []).filter(d => !toRemove.has(d)) }));
+      return { tasks, selectedTaskId: s.selectedTaskId && toRemove.has(s.selectedTaskId) ? null : s.selectedTaskId };
+    });
+  }
+
+  makeRow(t, level, hasChildren, expanded, display, progressMap, critical, ganttMeta, rowNumberMap, byId, numberToId, isSelected, baseRowStyle, depsDraft) {
+    const disp = display[t.id] || { start: t.startDate, end: t.startDate };
+    const prog = progressMap[t.id] || 0;
+    const color = STATUS_COLOR[t.status] || '#737982';
+    const barLeft = Math.max(diffDays(ganttMeta.minDate, disp.start) * ganttMeta.dayWidth, 0);
+    const barWidth = Math.max(diffDays(disp.start, disp.end) * ganttMeta.dayWidth, 6);
+    const isCrit = critical.has(t.id);
+    const depNums = (t.dependencies || []).map(id => rowNumberMap[id]).filter(Boolean);
+    const depsDisplay = depNums.length ? depNums.join(', ') : '\u2014';
+    const depsInputValue = depsDraft && depsDraft.hasOwnProperty(t.id) ? depsDraft[t.id] : depNums.join(', ');
+    const depsTitle = (t.dependencies || []).map(id => (byId[id] ? byId[id].name : id)).join(', ');
+    const comments = t.comments || [];
+    const commentCount = comments.length;
+    let latestUpdate = '\u2014', latestUpdateFull = '';
+    if (comments.length) {
+      const sorted = [...comments].sort((a, b) => new Date(b.ts) - new Date(a.ts));
+      latestUpdateFull = sorted[0].text;
+      latestUpdate = latestUpdateFull.length > 36 ? latestUpdateFull.slice(0, 36) + '\u2026' : latestUpdateFull;
+    }
+    const hasComments = commentCount > 0;
+    return {
+      kind: 'task', isMilestoneRow: false, isTaskRow: true,
+      rowStyle: baseRowStyle + (isSelected ? 'background:color-mix(in srgb, var(--ns-netskope-blue) 10%, white);' : ''),
+      id: t.id, level, number: rowNumberMap[t.id] || '',
+      depsDisplay, commentCount, latestUpdate, latestUpdateFull, hasComments,
+      detailsColor: hasComments ? 'var(--ns-deep-blue)' : 'var(--ns-fg-3)',
+      detailsBg: hasComments ? 'color-mix(in srgb, var(--ns-netskope-blue) 12%, white)' : 'transparent',
+      detailsBorder: hasComments ? 'color-mix(in srgb, var(--ns-netskope-blue) 35%, white)' : 'var(--ns-border)',
+      detailsTitle: hasComments ? (commentCount + ' update' + (commentCount === 1 ? '' : 's') + ' \u00b7 view details') : 'View details',
+      onDetailsClick: (e) => { e.stopPropagation(); this.openCommentsOverlay(t.id); },
+      onDepsCellClick: (e) => { e.stopPropagation(); this.openDepsEditor(t.id); },
+      indentStyle: 'padding-left:' + (level * 24) + 'px',
+      hasChildren, expanded, collapsed: !expanded,
+      name: t.name, status: t.status,
+      statusBadgeStyle: 'display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:0.75rem;font-weight:500;background:color-mix(in srgb, ' + color + ' 14%, white);color:' + color + ';border:1px solid color-mix(in srgb, ' + color + ' 35%, white);white-space:nowrap;',
+      category: t.category, subCategory: t.subCategory, assignee: t.assignee,
+      milestoneId: t.milestoneId,
+      startLabel: formatDate(disp.start), endLabel: formatDate(disp.end),
+      progress: prog,
+      isCritical: isCrit,
+      isLeaf: !hasChildren,
+      stop: (e) => e.stopPropagation(),
+      onNameChange: (e) => this.updateTask(t.id, { name: e.target.value }),
+      onNameKeyDown: (e) => this.onNameKeyDown(e, t.id),
+      onStatusCommit: (v) => this.commitFreeformValue(v, 'customStatuses', [...STATUS_OPTIONS, ...this.state.customStatuses], (val) => this.updateTask(t.id, { status: val })),
+      onAssigneeCommit: (v) => this.commitFreeformValue(v, 'customAssignees', [...ASSIGNEES, ...this.state.customAssignees], (val) => this.updateTask(t.id, { assignee: val })),
+      onCategoryCommit: (v) => this.commitFreeformValue(v, 'customCategories', [...CATEGORY_KEYS, ...this.state.customCategories], (val) => this.updateTask(t.id, { category: val })),
+      startDateRaw: t.startDate,
+      onStartDateChange: (e) => this.updateTask(t.id, { startDate: e.target.value }),
+      estimate: t.estimate || 0,
+      onEstimateChange: (e) => this.updateTask(t.id, { estimate: Math.max(0, parseInt(e.target.value || '0', 10)) }),
+      onProgressChange: (e) => this.updateTask(t.id, { progress: Math.max(0, Math.min(100, parseInt(e.target.value || '0', 10))) }),
+      onCommentInlineChange: (e) => this.onInlineCommentChange(t.id, e.target.value),
+      toggleExpand: (e) => { e.stopPropagation(); this.toggleExpand(t.id); },
+      select: () => this.openCommentsOverlay(t.id),
+      onDeleteRowClick: (e) => { e.stopPropagation(); this.deleteTask(t.id); },
+      ganttRowStyle: 'position:relative;height:34px;width:' + ganttMeta.totalWidth + 'px;border-bottom:1px solid var(--ns-divider);',
+      ganttBarStyle: 'position:absolute;top:6px;height:22px;left:' + barLeft + 'px;width:' + barWidth + 'px;background:' + color + ';border-radius:6px;' + (isCrit ? 'box-shadow:0 0 0 2px var(--ns-orange);' : '') + 'cursor:pointer;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:0.6875rem;overflow:hidden;white-space:nowrap;'
+    };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const tasks = s.tasks, milestones = s.milestones;
+    const byId = {}; tasks.forEach(t => byId[t.id] = t);
+    const milestoneById = {}; milestones.forEach(m => milestoneById[m.id] = m);
+    const base = computeBaseSchedules(tasks);
+    const display = computeDisplaySchedules(tasks, base);
+    const progressMap = computeProgressMap(tasks);
+    const critical = computeCriticalSet(tasks, base);
+
+    let minDate = null, maxDate = null;
+    tasks.forEach(t => {
+      const d = display[t.id]; if (!d) return;
+      if (!minDate || d.start < minDate) minDate = d.start;
+      if (!maxDate || d.end > maxDate) maxDate = d.end;
+    });
+    if (!minDate) { minDate = TODAY; maxDate = addDays(TODAY, 14); }
+    minDate = addDays(minDate, -3); maxDate = addDays(maxDate, 3);
+    const dayWidth = 24;
+    const totalDays = Math.max(diffDays(minDate, maxDate), 7);
+    const totalWidth = totalDays * dayWidth + 40;
+    const ganttMeta = { minDate, dayWidth, totalWidth };
+    const ganttTicks = [];
+    for (let d = 0; d <= totalDays; d += 7) {
+      ganttTicks.push({ style: 'position:absolute;top:12px;left:' + (d * dayWidth) + 'px;font-size:0.75rem;color:var(--ns-fg-3);white-space:nowrap;', label: formatDate(addDays(minDate, d)) });
+    }
+    const ganttHeaderStyle = 'position:relative;height:40px;border-bottom:1px solid var(--ns-divider);width:' + totalWidth + 'px;';
+
+    const anyFilter = s.filters.status !== 'All' || s.filters.category !== 'All' || s.filters.assignee !== 'All' || s.filters.milestone !== 'All' || (s.filters.search && s.filters.search.trim());
+    const matches = (t) => {
+      if (s.filters.status !== 'All' && t.status !== s.filters.status) return false;
+      if (s.filters.category !== 'All' && t.category !== s.filters.category) return false;
+      if (s.filters.assignee !== 'All' && t.assignee !== s.filters.assignee) return false;
+      if (s.filters.milestone !== 'All' && t.milestoneId !== s.filters.milestone) return false;
+      if (s.filters.search && s.filters.search.trim() && !t.name.toLowerCase().includes(s.filters.search.trim().toLowerCase())) return false;
+      return true;
+    };
+
+    const rowNumberMap = {};
+    let rowCounter = 0;
+    milestones.forEach(m => {
+      const tops = sortSiblings(tasks.filter(t => t.milestoneId === m.id && !t.parentId), s.sortKey, s.sortDir, display);
+      tops.forEach(t => {
+        const kids = sortSiblings(tasks.filter(k => k.parentId === t.id), s.sortKey, s.sortDir, display);
+        const expanded = s.expanded[t.id] !== false;
+        if (matches(t)) { rowCounter++; rowNumberMap[t.id] = rowCounter; }
+        if (expanded) kids.forEach(k => { if (matches(k)) { rowCounter++; rowNumberMap[k.id] = rowCounter; } });
+      });
+    });
+
+    const numberToId = {};
+    Object.keys(rowNumberMap).forEach(id => { numberToId[rowNumberMap[id]] = id; });
+
+    const colWidths = COLUMN_ORDER.map(k => s.columnWidths[k] || DEFAULT_COLUMN_WIDTHS[k]);
+    const tasksGridTemplate = colWidths.map(w => w + 'px').join(' ');
+    const tasksTableMinWidth = (colWidths.reduce((sum, w) => sum + w, 0) + (COLUMN_ORDER.length - 1) * 12 + 32) + 'px';
+    const tasksHeaderRowStyle = 'display:grid;grid-template-columns:' + tasksGridTemplate + ';gap:12px;padding:10px 16px;background:var(--ns-ink-050);font-size:0.6875rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--ns-fg-3);min-width:' + tasksTableMinWidth + ';';
+    const tasksRowGridStyleBase = 'display:grid;grid-template-columns:' + tasksGridTemplate + ';gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--ns-divider);cursor:pointer;min-width:' + tasksTableMinWidth + ';';
+
+    const rows = [];
+    milestones.forEach(m => {
+      const tops = sortSiblings(tasks.filter(t => t.milestoneId === m.id && !t.parentId), s.sortKey, s.sortDir, display);
+      const localRows = [];
+      tops.forEach(t => {
+        const kids = sortSiblings(tasks.filter(k => k.parentId === t.id), s.sortKey, s.sortDir, display);
+        const expanded = s.expanded[t.id] !== false;
+        if (matches(t)) localRows.push(this.makeRow(t, 0, kids.length > 0, expanded, display, progressMap, critical, ganttMeta, rowNumberMap, byId, numberToId, t.id === s.selectedTaskId, tasksRowGridStyleBase, s.depsDraft));
+        if (expanded) kids.forEach(k => { if (matches(k)) localRows.push(this.makeRow(k, 1, false, true, display, progressMap, critical, ganttMeta, rowNumberMap, byId, numberToId, k.id === s.selectedTaskId, tasksRowGridStyleBase, s.depsDraft)); });
+      });
+      if (localRows.length || !anyFilter) {
+        rows.push({ kind: 'milestone', isMilestoneRow: true, isTaskRow: false, id: m.id, name: m.name, onNameChange: (e) => this.updateMilestone(m.id, { name: e.target.value }), onNameKeyDown: (e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } }, ganttMilestoneStyle: 'height:34px;background:var(--ns-ink-050);border-bottom:1px solid var(--ns-divider);width:' + totalWidth + 'px;' });
+        rows.push(...localRows);
+      }
+    });
+    const tasksVisibleCount = rows.filter(r => r.isTaskRow).length;
+
+    const total = tasks.length;
+    const doneCount = tasks.filter(t => t.status === 'Done').length;
+    const overdueCount = tasks.filter(t => t.status !== 'Done' && display[t.id] && display[t.id].end < TODAY).length;
+    const completionPct = total ? Math.round(doneCount / total * 100) : 0;
+    const statCards = [
+      { label: 'Total Items', value: String(total), accent: 'var(--ns-deep-blue)' },
+      { label: 'Total Estimate', value: String(tasks.filter(t => !tasks.some(o => o.parentId === t.id)).reduce((sum, t) => sum + (t.estimate || 0), 0)) + ' days', accent: 'var(--ns-teal)' },
+      { label: 'Completed', value: completionPct + '%', accent: 'var(--ns-success)' },
+      { label: 'In Progress', value: String(tasks.filter(t => t.status === 'In Progress').length), accent: 'var(--ns-netskope-blue)' },
+      { label: 'Overdue', value: String(overdueCount), accent: overdueCount > 0 ? 'var(--ns-danger)' : 'var(--ns-fg-2)' }
+    ];
+    const statusBreakdown = STATUS_OPTIONS.map(st => {
+      const count = tasks.filter(t => t.status === st).length;
+      const pct = total ? Math.round(count / total * 100) : 0;
+      return { status: st, count, dotStyle: 'width:10px;height:10px;border-radius:50%;background:' + STATUS_COLOR[st] + ';flex-shrink:0;', barStyle: 'height:100%;width:' + pct + '%;background:' + STATUS_COLOR[st] + ';border-radius:999px;' };
+    });
+
+    const milestoneAgg = milestones.map(m => {
+      const mTasks = tasks.filter(t => t.milestoneId === m.id);
+      const ends = mTasks.map(t => display[t.id] ? display[t.id].end : TODAY);
+      const starts = mTasks.map(t => display[t.id] ? display[t.id].start : TODAY);
+      const endRaw = ends.length ? ends.reduce((a, b) => a > b ? a : b) : TODAY;
+      const startRaw = starts.length ? starts.reduce((a, b) => a < b ? a : b) : TODAY;
+      const prog = mTasks.length ? Math.round(mTasks.reduce((sum, t) => sum + (progressMap[t.id] || 0), 0) / mTasks.length) : 0;
+      return { id: m.id, name: m.name, endRaw, startRaw, prog, taskCount: mTasks.length, mTasks };
+    });
+    const upcomingMilestones = milestoneAgg.filter(m => m.prog < 100).sort((a, b) => a.endRaw < b.endRaw ? -1 : 1).map(m => ({
+      id: m.id, name: m.name, endLabel: formatDate(m.endRaw),
+      progressStyle: 'height:100%;width:' + m.prog + '%;background:var(--ns-netskope-blue);border-radius:999px;',
+      select: () => this.setState(st => ({ activeView: 'tasks', filters: { ...st.filters, milestone: m.id } }))
+    }));
+    const milestoneCards = milestoneAgg.map(m => ({
+      id: m.id, name: m.name, rangeLabel: formatDate(m.startRaw) + ' \u2013 ' + formatDate(m.endRaw), taskCount: m.taskCount, progress: m.prog,
+      progressInner: 'height:100%;width:' + m.prog + '%;background:var(--ns-netskope-blue);border-radius:999px;',
+      counts: STATUS_OPTIONS.map(st => ({ status: st, count: m.mTasks.filter(t => t.status === st).length, color: STATUS_COLOR[st] })),
+      select: () => this.setState(st => ({ activeView: 'tasks', filters: { ...st.filters, milestone: m.id } }))
+    }));
+
+    let allComments = [];
+    tasks.forEach(t => (t.comments || []).forEach(c => allComments.push({ ...c, taskId: t.id, taskName: t.name })));
+    allComments.sort((a, b) => new Date(b.ts) - new Date(a.ts));
+    const activityFeed = allComments.slice(0, 8).map(c => ({ ...c, tsLabel: formatTs(c.ts), select: () => this.openCommentsOverlay(c.taskId) }));
+
+    const headerColumns = COLUMN_ORDER.map(key => {
+      const sortable = SORTABLE_COLUMNS.has(key);
+      const sorted = s.sortKey === key;
+      return {
+        key, label: COLUMN_LABELS[key], sortable,
+        cursor: sortable ? 'pointer' : 'default',
+        sorted, arrow: sorted ? (s.sortDir === 'asc' ? '\u25b2' : '\u25bc') : '',
+        onClick: sortable ? () => this.toggleSort(key) : () => {},
+        resizable: key !== 'actions',
+        onResizeStart: (e) => this.startColumnResize(key, e)
+      };
+    });
+
+    let commentsOverlay = null;
+    if (s.commentsOverlayId && byId[s.commentsOverlayId]) {
+      const t = byId[s.commentsOverlayId];
+      const comments = [...(t.comments || [])].sort((a, b) => new Date(b.ts) - new Date(a.ts)).map(c => ({ ...c, tsLabel: formatTs(c.ts) }));
+      const deps = (t.dependencies || []).map(depId => {
+        const d = byId[depId]; if (!d) return null;
+        return { id: depId, name: d.name, statusColor: STATUS_COLOR[d.status] };
+      }).filter(Boolean);
+      commentsOverlay = {
+        name: t.name, comments, hasComments: comments.length > 0, hasCommentsFalse: comments.length === 0,
+        deps, hasDeps: deps.length > 0, hasDepsFalse: deps.length === 0,
+        milestoneId: t.milestoneId,
+        milestoneOptions: [...milestones.map(m => ({ id: m.id, name: m.name })), { id: ADD_NEW_VALUE, name: ADD_NEW_VALUE }],
+        onMilestoneChange: (e) => {
+          if (e.target.value === ADD_NEW_VALUE) {
+            const name = (typeof window !== 'undefined' && window.prompt) ? window.prompt('Enter new milestone name:') : null;
+            if (!name || !name.trim()) return;
+            const id = uid('m');
+            this.setState(s => ({ milestones: [...s.milestones, { id, name: name.trim() }] }));
+            this.moveTaskToMilestone(t.id, id);
+            return;
+          }
+          this.moveTaskToMilestone(t.id, e.target.value);
+        },
+        commentText: s.newCommentText,
+        onCommentChange: (e) => this.setState({ newCommentText: e.target.value }),
+        onPostComment: () => this.addComment(t.id),
+        notes: t.notes || '',
+        onNotesChange: (e) => this.updateTask(t.id, { notes: e.target.value }),
+        close: () => this.closeCommentsOverlay()
+      };
+    }
+
+    let depsEditor = null;
+    if (s.depsEditorTaskId && byId[s.depsEditorTaskId]) {
+      const t = byId[s.depsEditorTaskId];
+      const filterText = s.depsFilterText || '';
+      const q = filterText.trim().toLowerCase();
+      const options = tasks.filter(x => x.id !== t.id).map(x => ({
+        id: x.id, number: rowNumberMap[x.id] || '', name: x.name,
+        checked: (t.dependencies || []).includes(x.id),
+        toggle: () => this.toggleDependency(t.id, x.id)
+      })).sort((a, b) => (a.number || 0) - (b.number || 0))
+        .filter(o => !q || o.name.toLowerCase().includes(q) || String(o.number).includes(q));
+      depsEditor = {
+        name: t.name, options, hasOptions: options.length > 0, hasOptionsFalse: options.length === 0,
+        filterText, onFilterChange: (e) => this.setState({ depsFilterText: e.target.value }),
+        close: () => this.closeDepsEditor()
+      };
+    }
+
+    const navStyle = (active) => 'display:flex;align-items:center;gap:8px;padding:0 6px;height:56px;cursor:pointer;font-size:0.875rem;color:' + (active ? '#fff' : 'rgba(255,255,255,0.65)') + ';border-bottom:2px solid ' + (active ? 'var(--ns-netskope-blue)' : 'transparent') + ';';
+    const toggleBtnStyle = (active) => 'padding:7px 14px;font-size:0.8125rem;cursor:pointer;color:' + (active ? '#fff' : 'var(--ns-fg-2)') + ';background:' + (active ? 'var(--ns-deep-blue)' : '#fff') + ';';
+
+    const activeProjectMeta = s.projects.find(p => p.id === s.activeProjectId) || { name: 'Untitled Project' };
+    const projectMenuItems = s.projects.map(p => ({
+      id: p.id, name: p.name, isActive: p.id === s.activeProjectId,
+      textColor: p.id === s.activeProjectId ? 'var(--ns-netskope-blue)' : 'var(--ns-fg-1)',
+      fontWeight: p.id === s.activeProjectId ? 600 : 400,
+      select: () => this.switchProject(p.id)
+    }));
+
+    return {
+      activeViewIsDashboard: s.activeView === 'dashboard',
+      activeViewIsTasks: s.activeView === 'tasks',
+      activeViewIsMilestones: s.activeView === 'milestones',
+      activeViewIsTimeline: s.activeView === 'timeline',
+      showFilters: s.activeView === 'tasks' || s.activeView === 'timeline',
+      showToolbar: s.activeView !== 'dashboard',
+      showAddTaskButton: s.activeView !== 'dashboard' && s.activeView !== 'timeline',
+      activeProjectName: activeProjectMeta.name,
+      projectMenuOpen: !!s.projectMenuOpen,
+      projectMenuItems,
+      toggleProjectMenu: (e) => { e.stopPropagation(); this.toggleProjectMenu(); },
+      closeProjectMenu: () => this.closeProjectMenu(),
+      stopClick: (e) => e.stopPropagation(),
+      onCreateProject: () => { this.closeProjectMenu(); this.promptNewProject(); },
+      dashboardNavStyle: navStyle(s.activeView === 'dashboard'),
+      tasksNavStyle: navStyle(s.activeView === 'tasks'),
+      milestonesNavStyle: navStyle(s.activeView === 'milestones'),
+      timelineNavStyle: navStyle(s.activeView === 'timeline'),
+      goDashboard: () => this.setView('dashboard'),
+      goTasks: () => this.setView('tasks'),
+      goMilestones: () => this.setView('milestones'),
+      goTimeline: () => this.setView('timeline'),
+      onAddTask: () => this.addTask(),
+      searchValue: s.filters.search,
+      onSearchChange: (e) => this.setFilter('search', e.target.value),
+      statusFilterValue: s.filters.status,
+      onStatusFilterChange: (e) => this.setFilter('status', e.target.value),
+      statusFilterOptions: ['All', ...existingInOrder([...STATUS_OPTIONS, ...s.customStatuses], s.tasks, 'status')],
+      categoryFilterValue: s.filters.category,
+      onCategoryFilterChange: (e) => this.setFilter('category', e.target.value),
+      categoryFilterOptions: ['All', ...existingInOrder([...CATEGORY_KEYS, ...s.customCategories], s.tasks, 'category')],
+      assigneeFilterValue: s.filters.assignee,
+      onAssigneeFilterChange: (e) => this.setFilter('assignee', e.target.value),
+      assigneeFilterOptions: ['All', ...existingInOrder([...ASSIGNEES, ...s.customAssignees], s.tasks, 'assignee')],
+      milestoneFilterValue: s.filters.milestone,
+      onMilestoneFilterChange: (e) => this.setFilter('milestone', e.target.value),
+      milestoneFilterOptions: [{ id: 'All', name: 'All milestones' }, ...milestones],
+      statusOptionsList: [...STATUS_OPTIONS, ...s.customStatuses],
+      assigneeOptionsList: [...ASSIGNEES, ...s.customAssignees],
+      categoryOptionsList: [...CATEGORY_KEYS, ...s.customCategories],
+      rows, tasksVisibleCount,
+      statCards, statusBreakdown, upcomingMilestones, activityFeed, milestoneCards,
+      ganttTicks, ganttHeaderStyle,
+      hasCommentsOverlay: !!commentsOverlay, commentsOverlay,
+      hasDepsEditor: !!depsEditor, depsEditor,
+      hasSettingsOverlay: !!s.settingsOpen,
+      settingsOverlay: {
+        isConnected: !!s.googleAccessToken,
+        isNotConnected: !s.googleAccessToken,
+        userEmail: s.googleUserEmail || '',
+        hasUserEmail: !!s.googleUserEmail,
+        hasUserEmailFalse: !s.googleUserEmail,
+        onConnect: () => this.connectGoogle(),
+        onDisconnect: () => this.disconnectGoogle(),
+        spreadsheetId: (activeProjectMeta && activeProjectMeta.spreadsheetId) || '',
+        onSpreadsheetIdChange: (e) => this.updateProjectField(s.activeProjectId, 'spreadsheetId', e.target.value),
+        onSync: () => this.syncToSheet(),
+        busy: !!s.googleBusy,
+        statusText: s.googleStatus || '',
+        hasStatus: !!s.googleStatus,
+        lastBackupLabel: activeProjectMeta && activeProjectMeta.lastBackupAt ? ('Last backed up ' + new Date(activeProjectMeta.lastBackupAt).toLocaleString()) : 'Not backed up yet.',
+        activeProjectName: (activeProjectMeta && activeProjectMeta.name) || '',
+        isGeneralTab: (s.settingsTab || 'general') === 'general',
+        isProjectsTab: s.settingsTab === 'projects',
+        onTabGeneral: () => this.setSettingsTab('general'),
+        onTabProjects: () => this.setSettingsTab('projects'),
+        generalTabStyle: 'padding:10px 2px;font-size:0.8125rem;font-weight:500;cursor:pointer;border-bottom:2px solid ' + ((s.settingsTab || 'general') === 'general' ? 'var(--ns-netskope-blue)' : 'transparent') + ';color:' + ((s.settingsTab || 'general') === 'general' ? 'var(--ns-fg-1)' : 'var(--ns-fg-3)'),
+        projectsTabStyle: 'padding:10px 2px;font-size:0.8125rem;font-weight:500;cursor:pointer;border-bottom:2px solid ' + (s.settingsTab === 'projects' ? 'var(--ns-netskope-blue)' : 'transparent') + ';color:' + (s.settingsTab === 'projects' ? 'var(--ns-fg-1)' : 'var(--ns-fg-3)'),
+        projectsList: s.projects.map(p => ({
+          id: p.id, name: p.name, color: p.color, isActive: p.id === s.activeProjectId,
+          syncLabel: (p.spreadsheetId || '').trim() ? 'Synced to spreadsheet' : 'No spreadsheet configured',
+          onDelete: () => this.deleteProject(p.id)
+        })),
+        close: () => this.closeSettings()
+      },
+      openSettings: (e) => { e.stopPropagation(); this.toggleSettings(); },
+      onExportCsv: (e) => { e.stopPropagation(); this.exportTasksCsv(); },
+      canSync: !!s.googleAccessToken && !!((activeProjectMeta && activeProjectMeta.spreadsheetId || '').trim()),
+      syncTitle: s.googleBusy ? 'Syncing…' : 'Sync to spreadsheet',
+      onSyncClick: (e) => { e.stopPropagation(); this.syncToSheet(); },
+      headerColumns, tasksHeaderRowStyle, tasksTableMinWidth,
+      milestoneOptionsList: milestones.map(m => ({ id: m.id, name: m.name }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

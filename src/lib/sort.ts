@@ -7,10 +7,10 @@ export function sortSiblings(
   sortDir: 'asc' | 'desc',
   displaySchedules: { [taskId: string]: { start: string; end: string } }
 ): Task[] {
-  if (!sortKey) return tasks
-
-  // Filter to siblings with the same parentId
+  // Filter to siblings with the same parentId first
   const siblings = tasks.filter(t => t.parentId === parentId)
+
+  if (!sortKey) return siblings
 
   const dir = sortDir === 'desc' ? -1 : 1
 

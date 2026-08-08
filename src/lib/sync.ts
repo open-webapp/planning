@@ -11,17 +11,34 @@ import { parseTasksCsvString, buildTasksCsvString } from './csv'
  * content available" rather than thrown.
  */
 async function getDriveCsvContent(fileId: string, projectId: string): Promise<string | null> {
+  if (!fileId) {
+    throw new Error('Cannot read Drive file: fileId is missing or empty')
+  }
   const content = await drive.project(projectId).files.read(fileId)
-  if (content === null) return null
-  return typeof content === 'string' ? content : null
+  if (content === null) {
+    console.warn(`Drive file ${fileId} returned null - likely file does not exist`)
+    return null
+  }
+  if (typeof content === 'string') {
+    console.log(`Successfully read Drive file ${fileId}: ${content.split('\n').length} lines`)
+    return content
+  }
+  console.warn(`Drive file ${fileId} returned Blob instead of string text`)
+  return null
 }
 
 async function updateDriveCsvFile(fileId: string, csvContent: string, projectId: string): Promise<void> {
-  await drive.project(projectId).files.write({
+  if (!fileId) {
+    throw new Error('Cannot update Drive file: fileId is missing or empty')
+  }
+  const result = await drive.project(projectId).files.write({
     fileId,
     content: csvContent,
     mimeType: 'text/csv',
   })
+  if (result?.id) {
+    console.log(`Successfully updated Drive file ${fileId}`)
+  }
 }
 
 /**
